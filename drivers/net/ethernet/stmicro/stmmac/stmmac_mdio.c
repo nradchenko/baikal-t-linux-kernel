@@ -349,6 +349,16 @@ int stmmac_mdio_reset(struct mii_bus *bus)
 	struct net_device *ndev = bus->priv;
 	struct stmmac_priv *priv = netdev_priv(ndev);
 	unsigned int mii_address = priv->hw->mii.addr;
+	int ret;
+
+	/* TODO Temporary solution. DELME when you are done with implementing
+	 * the generic DW MAC GPIOs support.
+	 */
+	if (priv->plat->bus_reset) {
+		ret = priv->plat->bus_reset(priv->plat->bsp_priv);
+		if (ret)
+			return ret;
+	}
 
 #ifdef CONFIG_OF
 	if (priv->device->of_node) {
@@ -389,39 +399,52 @@ int stmmac_mdio_reset(struct mii_bus *bus)
 	return 0;
 }
 
-int stmmac_xpcs_setup(struct mii_bus *bus)
+int stmmac_xpcs_setup(struct net_device *ndev)
 {
-	struct net_device *ndev = bus->priv;
-	struct mdio_device *mdiodev;
+	struct fwnode_handle *fwnode;
 	struct stmmac_priv *priv;
 	struct dw_xpcs *xpcs;
-	int mode, addr;
+	int ret, mode, addr;
 
 	priv = netdev_priv(ndev);
 	mode = priv->plat->phy_interface;
+	fwnode = of_fwnode_handle(priv->plat->phylink_node);
 
-	/* Try to probe the XPCS by scanning all addresses. */
-	for (addr = 0; addr < PHY_MAX_ADDR; addr++) {
-		mdiodev = mdio_device_create(bus, addr);
-		if (IS_ERR(mdiodev))
-			continue;
+	/* If PCS-node is specified use it to create the XPCS descriptor */
+	if (fwnode_property_present(fwnode, "pcs-handle")) {
+		xpcs = xpcs_create_bynode(fwnode, mode);
+		ret = PTR_ERR_OR_ZERO(xpcs);
+	} else if (priv->plat->mdio_bus_data && priv->plat->mdio_bus_data->has_xpcs) {
+		/* Try to probe the XPCS by scanning all addresses */
+		for (ret = -ENODEV, addr = 0; addr < PHY_MAX_ADDR; addr++) {
+			xpcs = xpcs_create_byaddr(priv->mii, addr, mode);
+			if (IS_ERR(xpcs))
+				continue;
 
-		xpcs = xpcs_create(mdiodev, mode);
-		if (IS_ERR_OR_NULL(xpcs)) {
-			mdio_device_free(mdiodev);
-			continue;
+			ret = 0;
+			break;
 		}
-
-		priv->hw->xpcs = xpcs;
-		break;
+	} else {
+		return 0;
 	}
 
-	if (!priv->hw->xpcs) {
-		dev_warn(priv->device, "No xPCS found\n");
-		return -ENODEV;
-	}
+	if (ret)
+		return dev_err_probe(priv->device, ret, "No xPCS found\n");
+
+	priv->hw->xpcs = xpcs;
 
 	return 0;
+}
+
+void stmmac_xpcs_clean(struct net_device *ndev)
+{
+	struct stmmac_priv *priv = netdev_priv(ndev);
+
+	if (!priv->hw->xpcs)
+		return;
+
+	xpcs_destroy(priv->hw->xpcs);
+	priv->hw->xpcs = NULL;
 }
 
 /**
@@ -441,10 +464,10 @@ int stmmac_mdio_register(struct net_device *ndev)
 	struct fwnode_handle *fixed_node;
 	int addr, found, max_addr;
 
-	if (!mdio_bus_data)
+	if (!mdio_bus_data || !priv->plat->sma)
 		return 0;
 
-	new_bus = mdiobus_alloc();
+	priv->mii = new_bus = mdiobus_alloc();
 	if (!new_bus)
 		return -ENOMEM;
 
@@ -543,14 +566,13 @@ int stmmac_mdio_register(struct net_device *ndev)
 	}
 
 bus_register_done:
-	priv->mii = new_bus;
-
 	return 0;
 
 no_phy_found:
 	mdiobus_unregister(new_bus);
 bus_register_fail:
 	mdiobus_free(new_bus);
+	priv->mii = NULL;
 	return err;
 }
 
@@ -565,11 +587,6 @@ int stmmac_mdio_unregister(struct net_device *ndev)
 
 	if (!priv->mii)
 		return 0;
-
-	if (priv->hw->xpcs) {
-		mdio_device_free(priv->hw->xpcs->mdiodev);
-		xpcs_destroy(priv->hw->xpcs);
-	}
 
 	mdiobus_unregister(priv->mii);
 	priv->mii->priv = NULL;

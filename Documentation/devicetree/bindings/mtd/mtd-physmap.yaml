@@ -52,6 +52,10 @@ properties:
               - cypress,cy7c1019dv33-10zsxi
               - arm,vexpress-psram
           - const: mtd-ram
+      - items:
+          - enum:
+              - baikal,bt1-int-rom
+          - const: mtd-rom
       - enum:
           - cfi-flash
           - jedec-flash

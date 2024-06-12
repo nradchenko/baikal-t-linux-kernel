@@ -1711,6 +1711,10 @@ int xhci_bus_suspend(struct usb_hcd *hcd)
 	bus_state = &rhub->bus_state;
 	wake_enabled = hcd->self.root_hub->do_remote_wakeup;
 
+	/* FIXME Workaround CSRTimeout error on the PORTSC access */
+	if (time_before(jiffies, bus_state->next_statechange))
+		msleep(5);
+
 	spin_lock_irqsave(&xhci->lock, flags);
 
 	if (wake_enabled) {

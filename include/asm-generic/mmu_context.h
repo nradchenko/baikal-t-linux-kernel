@@ -73,4 +73,14 @@ static inline void deactivate_mm(struct task_struct *tsk,
 }
 #endif
 
+/**
+ * tlb_prefetch - called if by design TLB-prefetching is required
+ * @addr: Virtual address
+ */
+#ifndef tlb_prefetch
+static inline void tlb_prefetch(unsigned long addr)
+{
+}
+#endif
+
 #endif /* __ASM_GENERIC_MMU_CONTEXT_H */

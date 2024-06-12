@@ -232,6 +232,67 @@ drop_mmu_context(struct mm_struct *mm)
 	local_irq_restore(flags);
 }
 
+#ifdef CONFIG_MIPS_BAIKAL_T1
+/* Workaround for core stuck on TLB load exception */
+#define tlb_prefetch tlb_prefetch
+static inline void tlb_prefetch(unsigned long addr)
+{
+	pgd_t *pgdp;
+	p4d_t *p4dp;
+	pud_t *pudp;
+	pmd_t *pmdp;
+	pte_t *ptep;
+	int idx, pid;
+
+	if (addr < MAP_BASE)
+		return;
+
+	addr &= (PAGE_MASK << 1);
+	if (cpu_has_mmid) {
+		write_c0_entryhi(addr);
+	} else {
+		pid = read_c0_entryhi() & cpu_asid_mask(&current_cpu_data);
+		write_c0_entryhi(addr | pid);
+	}
+	pgdp = pgd_offset(&init_mm, addr);
+	mtc0_tlbw_hazard();
+	tlb_probe();
+	tlb_probe_hazard();
+	p4dp = p4d_offset(pgdp, addr);
+	pudp = pud_offset(p4dp, addr);
+	pmdp = pmd_offset(pudp, addr);
+	idx = read_c0_index();
+
+	ptep = pte_offset_map(pmdp, addr);
+
+#if defined(CONFIG_PHYS_ADDR_T_64BIT) && defined(CONFIG_CPU_MIPS32)
+#ifdef CONFIG_XPA
+	write_c0_entrylo0(pte_to_entrylo(ptep->pte_high));
+	if (cpu_has_xpa)
+		writex_c0_entrylo0(ptep->pte_low & _PFNX_MASK);
+	ptep++;
+	write_c0_entrylo1(pte_to_entrylo(ptep->pte_high));
+	if (cpu_has_xpa)
+		writex_c0_entrylo1(ptep->pte_low & _PFNX_MASK);
+#else
+	write_c0_entrylo0(ptep->pte_high);
+	ptep++;
+	write_c0_entrylo1(ptep->pte_high);
+#endif
+#else
+	write_c0_entrylo0(pte_to_entrylo(pte_val(*ptep++)));
+	write_c0_entrylo1(pte_to_entrylo(pte_val(*ptep)));
+#endif
+	mtc0_tlbw_hazard();
+	if (idx < 0)
+		tlb_write_random();
+	else
+		tlb_write_indexed();
+
+	tlbw_use_hazard();
+}
+#endif
+
 #include <asm-generic/mmu_context.h>
 
 #endif /* _ASM_MMU_CONTEXT_H */

@@ -37,7 +37,7 @@ struct plat_smp_ops {
 #ifdef CONFIG_KEXEC
 	void (*kexec_nonboot_cpu)(void);
 #endif
-};
+} __no_randomize_layout;
 
 extern void register_smp_ops(const struct plat_smp_ops *ops);
 

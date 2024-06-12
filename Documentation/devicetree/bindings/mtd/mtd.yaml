@@ -12,7 +12,7 @@ maintainers:
 
 properties:
   $nodename:
-    pattern: "^flash(@.*)?$"
+    pattern: "^(flash|rom|sram-controller|.*sram)(@.*)?$"
 
   label:
     description:

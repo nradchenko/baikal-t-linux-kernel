@@ -6,16 +6,37 @@
  * Author: Jose Abreu <Jose.Abreu@synopsys.com>
  */
 
-#define SYNOPSYS_XPCS_ID		0x7996ced0
-#define SYNOPSYS_XPCS_MASK		0xffffffff
+#include <linux/bits.h>
+#include <linux/pcs/pcs-xpcs.h>
 
 /* Vendor regs access */
 #define DW_VENDOR			BIT(15)
 
+/* VR_XS_PMA */
+#define DW_VR_XS_PMA_GEN5_10G_MPLL_CTRL	0x007a
+#define DW_VR_XS_PMA_REF_CLK_SEL_CORE	BIT(13)
+#define DW_VR_XS_PMA_GEN5_10G_GEN_CTRL	0x009c
+#define DW_VR_XS_PMA_LANE_MODE		GENMASK(3, 0)
+#define DW_VR_XS_PMA_LANE_MODE_KX	0x3
+#define DW_VR_XS_PMA_LANE_MODE_KX4	0x4
+#define DW_VR_XS_PMA_LANE_MODE_KR	0x5
+#define DW_VR_XS_PMA_LANE_MODE_SGMII	0x6
+#define DW_VR_XS_PMA_LANE_MODE_RXAUI	0x8
+#define DW_VR_XS_PMA_LINK_WIDTH		GENMASK(10, 8)
+#define DW_VR_XS_PMA_LINK_WIDTH_1	0x0
+#define DW_VR_XS_PMA_LINK_WIDTH_2	0x1
+#define DW_VR_XS_PMA_LINK_WIDTH_4	0x2
+#define DW_VR_XS_PMA_LANE_PWR_OFF	GENMASK(15, 12)
+
 /* VR_XS_PCS */
 #define DW_USXGMII_RST			BIT(10)
 #define DW_USXGMII_EN			BIT(9)
+#define DW_VR_XS_PCS_XAUI_MODE_CTRL	0x0004
+#define DW_VR_XS_PCS_RXAUI_MODE		BIT(0)
+#define DW_VR_XS_PCS_MRVL_RXAUI		BIT(1)
 #define DW_VR_XS_PCS_DIG_STS		0x0010
+#define DW_PSEQ_STATE			GENMASK(4, 2)
+#define DW_PSEQ_TXRX_STABLE		0x100
 #define DW_RXFIFO_ERR			GENMASK(6, 5)
 
 /* SR_MII */
@@ -32,9 +53,6 @@
 #define DW_SR_AN_ADV1			0x10
 #define DW_SR_AN_ADV2			0x11
 #define DW_SR_AN_ADV3			0x12
-#define DW_SR_AN_LP_ABL1		0x13
-#define DW_SR_AN_LP_ABL2		0x14
-#define DW_SR_AN_LP_ABL3		0x15
 
 /* Clause 73 Defines */
 /* AN_LP_ABL1 */
@@ -48,6 +66,13 @@
 /* AN_LP_ABL3 */
 #define DW_C73_2500KX			BIT(0)
 #define DW_C73_5000KR			BIT(1)
+
+/* VR_CTRL_MMD */
+#define DW_SR_CTRL_MMD_CTRL		0x0009
+#define DW_SR_CTRL_AN_MMD_EN		BIT(0)
+#define DW_SR_CTRL_PCS_XS_MMD_EN	BIT(1)
+#define DW_SR_CTRL_MII_MMD_EN		BIT(2)
+#define DW_SR_CTRL_PMA_MMD_EN		BIT(3)
 
 /* Clause 37 Defines */
 /* VR MII MMD registers offsets */
@@ -107,8 +132,21 @@
 /* VR MII EEE Control 1 defines */
 #define DW_VR_MII_EEE_TRN_LPI		BIT(0)	/* Transparent Mode Enable */
 
+#define DW_XPCS_INFO_DECLARE(_name, _did, _pma)			\
+	static const struct dw_xpcs_info _name = { .did = _did, .pma = _pma }
+
 int xpcs_read(struct dw_xpcs *xpcs, int dev, u32 reg);
 int xpcs_write(struct dw_xpcs *xpcs, int dev, u32 reg, u16 val);
+int xpcs_modify(struct dw_xpcs *xpcs, int dev, u32 reg, u16 mask, u16 set);
+int xpcs_modify_changed(struct dw_xpcs *xpcs, int dev, u32 reg, u16 mask, u16 set);
+int xpcs_read_vendor(struct dw_xpcs *xpcs, int dev, u32 reg);
+int xpcs_write_vendor(struct dw_xpcs *xpcs, int dev, int reg, u16 val);
+int xpcs_poll_val(struct dw_xpcs *xpcs, int dev, int reg, u16 mask, u16 val);
+int xpcs_soft_reset(struct dw_xpcs *xpcs);
+int xpcs_vendor_reset(struct dw_xpcs *xpcs);
+
+int xpcs_10gbaser_pma_config(struct dw_xpcs *xpcs);
+int xpcs_10gbasex_pma_config(struct dw_xpcs *xpcs);
 int nxp_sja1105_sgmii_pma_config(struct dw_xpcs *xpcs);
 int nxp_sja1110_sgmii_pma_config(struct dw_xpcs *xpcs);
 int nxp_sja1110_2500basex_pma_config(struct dw_xpcs *xpcs);

@@ -36,6 +36,7 @@ properties:
         - nvidia,tegra234-sysram
         - qcom,rpm-msg-ram
         - rockchip,rk3288-pmu-sram
+        - baikal,bt1-sram
 
   reg:
     maxItems: 1
@@ -45,6 +46,15 @@ properties:
     description:
       A list of phandle and clock specifier pair that controls the single
       SRAM clock.
+
+  clock-names: true
+
+  resets:
+    description:
+      A list of phandle and reset specifier pair that controls the SRAM
+      state reset.
+
+  reset-names: true
 
   "#address-cells":
     const: 1
@@ -89,6 +99,7 @@ patternProperties:
             - arm,juno-scp-shmem
             - arm,scmi-shmem
             - arm,scp-shmem
+            - baikal,bt1-boot-sram
             - renesas,smp-sram
             - rockchip,rk3066-smp-sram
             - samsung,exynos4210-sysram
@@ -135,21 +146,37 @@ required:
   - compatible
   - reg
 
-if:
-  not:
-    properties:
-      compatible:
-        contains:
-          enum:
-            - qcom,rpm-msg-ram
-            - rockchip,rk3288-pmu-sram
-then:
-  required:
-    - "#address-cells"
-    - "#size-cells"
-    - ranges
+allOf:
+  - $ref: /schemas/mux/mux-consumer.yaml#
+  - if:
+      properties:
+        compatible:
+          contains:
+            const: baikal,bt1-sram
+    then:
+      properties:
+        mux-controls:
+          maxItems: 1
+      required:
+        - mux-controls
+    else:
+      properties:
+        mux-controls: false
+  - if:
+      properties:
+        compatible:
+          not:
+            contains:
+              enum:
+                - qcom,rpm-msg-ram
+                - rockchip,rk3288-pmu-sram
+    then:
+      required:
+        - "#address-cells"
+        - "#size-cells"
+        - ranges
 
-additionalProperties: false
+unevaluatedProperties: false
 
 examples:
   - |

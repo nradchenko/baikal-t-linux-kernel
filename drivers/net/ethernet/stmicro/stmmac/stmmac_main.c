@@ -301,7 +301,12 @@ static void stmmac_clk_csr_set(struct stmmac_priv *priv)
 {
 	u32 clk_rate;
 
-	clk_rate = clk_get_rate(priv->plat->stmmac_clk);
+	/* If APB clock has been specified then it is supposed to be used
+	 * to select the CSR mode. Otherwise the application clock is the
+	 * source of the periodic signal for the CSR interface.
+	 */
+	clk_rate = clk_get_rate(priv->plat->pclk) ?:
+		   clk_get_rate(priv->plat->stmmac_clk);
 
 	/* Platform provided default clk_csr would be assumed valid
 	 * for all other cases except for the below mentioned ones.
@@ -727,8 +732,7 @@ static int stmmac_hwtstamp_set(struct net_device *dev, struct ifreq *ifr)
 			config.rx_filter = HWTSTAMP_FILTER_PTP_V2_EVENT;
 			ptp_v2 = PTP_TCR_TSVER2ENA;
 			snap_type_sel = PTP_TCR_SNAPTYPSEL_1;
-			if (priv->synopsys_id < DWMAC_CORE_4_10)
-				ts_event_en = PTP_TCR_TSEVNTENA;
+
 			ptp_over_ipv4_udp = PTP_TCR_TSIPV4ENA;
 			ptp_over_ipv6_udp = PTP_TCR_TSIPV6ENA;
 			ptp_over_ethernet = PTP_TCR_TSIPENA;
@@ -991,7 +995,18 @@ static void stmmac_mac_link_up(struct phylink_config *config,
 	old_ctrl = readl(priv->ioaddr + MAC_CTRL_REG);
 	ctrl = old_ctrl & ~priv->hw->link.speed_mask;
 
-	if (interface == PHY_INTERFACE_MODE_USXGMII) {
+	if (interface == PHY_INTERFACE_MODE_XGMII ||
+	    interface == PHY_INTERFACE_MODE_10GBASER ||
+	    interface == PHY_INTERFACE_MODE_10GBASEX ||
+	    interface == PHY_INTERFACE_MODE_XAUI) {
+		switch (speed) {
+		case SPEED_10000:
+			ctrl |= priv->hw->link.xgmii.speed10000;
+			break;
+		default:
+			return;
+		}
+	} else if (interface == PHY_INTERFACE_MODE_USXGMII) {
 		switch (speed) {
 		case SPEED_10000:
 			ctrl |= priv->hw->link.xgmii.speed10000;
@@ -1001,6 +1016,9 @@ static void stmmac_mac_link_up(struct phylink_config *config,
 			break;
 		case SPEED_2500:
 			ctrl |= priv->hw->link.xgmii.speed2500;
+			break;
+		case SPEED_1000:
+			ctrl |= priv->hw->link.speed1000;
 			break;
 		default:
 			return;
@@ -2923,7 +2941,10 @@ static int stmmac_init_dma_engine(struct stmmac_priv *priv)
 	if (priv->extend_desc && (priv->mode == STMMAC_RING_MODE))
 		atds = 1;
 
-	ret = stmmac_reset(priv, priv->ioaddr);
+	if (priv->plat->swr_reset)
+		ret = priv->plat->swr_reset(priv->plat->bsp_priv);
+	else
+		ret = stmmac_reset(priv, priv->ioaddr);
 	if (ret) {
 		dev_err(priv->device, "Failed to reset the dma\n");
 		return ret;
@@ -3448,7 +3469,7 @@ static void stmmac_free_irq(struct net_device *dev,
 
 	switch (irq_err) {
 	case REQ_IRQ_ERR_ALL:
-		irq_idx = priv->plat->tx_queues_to_use;
+		irq_idx = priv->plat->multi_msi_en ? priv->plat->tx_queues_to_use : 0;
 		fallthrough;
 	case REQ_IRQ_ERR_TX:
 		for (j = irq_idx - 1; j >= 0; j--) {
@@ -3457,7 +3478,7 @@ static void stmmac_free_irq(struct net_device *dev,
 				free_irq(priv->tx_irq[j], &priv->dma_conf.tx_queue[j]);
 			}
 		}
-		irq_idx = priv->plat->rx_queues_to_use;
+		irq_idx = priv->plat->multi_msi_en ? priv->plat->rx_queues_to_use : 0;
 		fallthrough;
 	case REQ_IRQ_ERR_RX:
 		for (j = irq_idx - 1; j >= 0; j--) {
@@ -6869,8 +6890,13 @@ static int stmmac_hw_init(struct stmmac_priv *priv)
 		else if (priv->dma_cap.rx_coe_type1)
 			priv->plat->rx_coe = STMMAC_RX_COE_TYPE1;
 
+		/* Override the SMA availability flag with the actual caps */
+		priv->plat->sma = priv->dma_cap.sma_mdio;
 	} else {
 		dev_info(priv->device, "No HW DMA feature register supported\n");
+
+		/* TODO Temporarily default to always on SMA */
+		priv->plat->sma = 1;
 	}
 
 	if (priv->plat->rx_coe) {
@@ -7319,11 +7345,9 @@ int stmmac_dvr_probe(struct device *device,
 	if (priv->plat->speed_mode_2500)
 		priv->plat->speed_mode_2500(ndev, priv->plat->bsp_priv);
 
-	if (priv->plat->mdio_bus_data && priv->plat->mdio_bus_data->has_xpcs) {
-		ret = stmmac_xpcs_setup(priv->mii);
-		if (ret)
-			goto error_xpcs_setup;
-	}
+	ret = stmmac_xpcs_setup(ndev);
+	if (ret)
+		goto error_xpcs_setup;
 
 	ret = stmmac_phy_setup(priv);
 	if (ret) {
@@ -7354,8 +7378,9 @@ int stmmac_dvr_probe(struct device *device,
 
 error_netdev_register:
 	phylink_destroy(priv->phylink);
-error_xpcs_setup:
 error_phy_setup:
+	stmmac_xpcs_clean(ndev);
+error_xpcs_setup:
 	if (priv->hw->pcs != STMMAC_PCS_TBI &&
 	    priv->hw->pcs != STMMAC_PCS_RTBI)
 		stmmac_mdio_unregister(ndev);
@@ -7394,12 +7419,18 @@ int stmmac_dvr_remove(struct device *dev)
 	stmmac_exit_fs(ndev);
 #endif
 	phylink_destroy(priv->phylink);
-	if (priv->plat->stmmac_rst)
-		reset_control_assert(priv->plat->stmmac_rst);
-	reset_control_assert(priv->plat->stmmac_ahb_rst);
+
+	stmmac_xpcs_clean(ndev);
+
 	if (priv->hw->pcs != STMMAC_PCS_TBI &&
 	    priv->hw->pcs != STMMAC_PCS_RTBI)
 		stmmac_mdio_unregister(ndev);
+
+	if (priv->plat->stmmac_rst)
+		reset_control_assert(priv->plat->stmmac_rst);
+
+	reset_control_assert(priv->plat->stmmac_ahb_rst);
+
 	destroy_workqueue(priv->wq);
 	mutex_destroy(&priv->lock);
 	bitmap_free(priv->af_xdp_zc_qps);

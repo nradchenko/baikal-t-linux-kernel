@@ -114,7 +114,7 @@ struct cpuinfo_mips {
 	 */
 	u32 loongson3_cpucfg_data[3];
 #endif
-} __attribute__((aligned(SMP_CACHE_BYTES)));
+} __aligned(SMP_CACHE_BYTES) __randomize_layout;
 
 extern struct cpuinfo_mips cpu_data[];
 #define current_cpu_data cpu_data[smp_processor_id()]

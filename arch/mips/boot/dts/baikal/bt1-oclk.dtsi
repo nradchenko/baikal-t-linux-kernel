@@ -1,0 +1,82 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * Copyright (C) 2022 BAIKAL ELECTRONICS, JSC
+ *
+ * Baikal-T1 SoC overclocking device tree
+ */
+
+#include <dt-bindings/clock/bt1-ccu.h>
+
+/*
+ * WARNING! This file provides the Baikal-T1 SoC overclocking settings. Since
+ * the specified clock rates are officially unsupported there is no firm
+ * guarantee the system will stably work if they are applied. So use it at your
+ * own risk.
+ */
+
+&cpu_opp {
+	opp-1300000000 {
+		opp-hz = /bits/ 64 <1300000000>;
+		clock-latency-ns = <20000>;
+		turbo-mode;
+	};
+
+	opp-1400000000 {
+		opp-hz = /bits/ 64 <1400000000>;
+		clock-latency-ns = <20000>;
+		turbo-mode;
+	};
+
+	opp-1500000000 {
+		opp-hz = /bits/ 64 <1500000000>;
+		clock-latency-ns = <20000>;
+		turbo-mode;
+	};
+};
+
+/*
+ * In general the system is working well with the CSRs bus rate above 50MHz
+ * and up to 300MHz, but it hasn't been fully tested yet. For instance, DW DMA
+ * won't work well with APB clock being greater than 200 MHz. So if you mean to
+ * use the DMA-based communications over the I2C/UART/SPI interfaces don't
+ * exceed the 200MHz limit.
+ */
+&apb {
+	assigned-clocks = <&ccu_sys CCU_SYS_APB_CLK>;
+	assigned-clock-rates = <200000000>;
+};
+
+/*
+ * For this to work well the overclocked rates must be set on the fully
+ * disabled PCIe controller.
+ */
+&pcie {
+	assigned-clocks = <&ccu_axi CCU_AXI_PCIE_M_CLK>,
+			  <&ccu_axi CCU_AXI_PCIE_S_CLK>;
+	assigned-clock-rates = <600000000>, <600000000>;
+};
+
+&sata {
+	assigned-clocks = <&ccu_axi CCU_AXI_SATA_CLK>;
+	assigned-clock-rates = <300000000>;
+};
+
+&xgmac {
+	assigned-clocks = <&ccu_axi CCU_AXI_XGMAC_CLK>;
+	assigned-clock-rates = <312500000>;
+};
+
+&gmac0 {
+	assigned-clocks = <&ccu_axi CCU_AXI_GMAC0_CLK>;
+	assigned-clock-rates = <250000000>;
+};
+
+&gmac1 {
+	assigned-clocks = <&ccu_axi CCU_AXI_GMAC1_CLK>;
+	assigned-clock-rates = <250000000>;
+};
+
+&usb {
+	assigned-clocks = <&ccu_axi CCU_AXI_USB_CLK>;
+	assigned-clock-rates = <300000000>;
+};

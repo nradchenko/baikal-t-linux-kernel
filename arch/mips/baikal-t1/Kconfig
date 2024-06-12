@@ -1,0 +1,117 @@
+# SPDX-License-Identifier: GPL-2.0-only
+#
+# Copyright (C) 2020 BAIKAL ELECTRONICS, JSC
+#
+# Baikal-T1 platform configs
+#
+if MIPS_BAIKAL_T1
+
+config BT1_DEBUG
+	bool "Enable SoC/kernel debug options"
+	select EXPERT
+	select DEBUG_KERNEL
+	select DEBUG_ZBOOT
+	select DEBUG_MEMORY_INIT
+	select DEBUG_HIGHMEM if HIGHMEM
+	select DEBUG_STACKOVERFLOW
+	select RCU_TRACE
+	select EDAC_DEBUG if EDAC
+	select SCACHE_DEBUGFS
+	select GENERIC_IRQ_DEBUGFS
+	select CMA_DEBUGFS if CMA
+	select MIPS_CPS_NS16550_BOOL if MIPS_CPS
+	help
+	  Use this option if you at the process of the kernel drivers
+	  platform code development.
+
+config BT1_EARLY_UART
+	int "Default UART device for early printk and zboot"
+	range 0 1
+	default 0
+	help
+	  There are two DW APB UART-based serial interfaces available on
+	  Baikal-T1 SoC. By this option you can select one of them to be used
+	  to print early logs and zboot debug symbols. Note having both
+	  EARLY_PRINTK and SERIAL_EARLYCON configs enabled is prune to
+	  getting duplicated log messages if both of these sub-systems are
+	  using the same console. In case if you need to have the logs on both
+	  UART devices make sure that this parameter and 'stdout-path' DT
+	  property point to the different serial devices.
+
+config BT1_CPU_FEATURE_OVERRIDES
+	bool "Declare CPU features"
+	help
+	  By default nearly all the MIPS IP-core features are detectable on
+	  runtime. Corresponding cpu_has_* flags are constantly checked in
+	  the code to enabled/disable corresponding platform features. Since
+	  we indend to build the Baikal-T1 CPU specific kernel there is no
+	  need in such flexibility, so we can freely define these flags with
+	  values known at build-time. By doing so we not only decrease the
+	  kernel size, but also speed it up.
+
+	  If unsure, say N.
+
+config BT1_SWIOTLB_SIZE
+	int "SWIOTLB size in MiB" if SWIOTLB
+	range 4 64
+	default 8
+	help
+	  Due to the Baikal-T1 main interconnect controller invalid synthesis
+	  parameters, SATA/USB/GMACx aren't able to access the physical memory
+	  higher than 4GiB. So in case if XPA is enabled and bootloader states
+	  there is more than 4GiB of physical memory, we need to have the
+	  SWIOTLB declared. Since by default SWIOTLB consumes too much memory
+	  we create a custom table with compile-time configurable buffer size.
+
+choice
+	prompt "Baikal-T1 SoC based boards devicetree"
+	default BT1_DTB_NONE
+	help
+	  Select a devicetree of the board with Baikal-T1 SoC installed.
+
+	config BT1_DTB_NONE
+	bool "None"
+
+	config BT1_DTB_ALL
+	bool "All"
+
+	config BT1_DTB_GENERIC
+	bool "Generic Baikal-T1 Board"
+	help
+	  This option provides a dtb for a generic board. It just activates all
+	  the Baikal-T1 SoC peripherals. So all the run-time detectable devices
+	  will work out-of-box while undetectable platform devices will be left
+	  untouched.
+
+	config BT1_DTB_BFK
+	bool "Baikal Electronics BFK"
+	help
+	  This option provides a dtb for the Baikal Electronics BFK boards.
+	  It's a Baikal-T1 SoC evaluation board specifically designed for
+	  the SoC-based software prototyping.
+
+endchoice
+
+menu "Baikal-T1 Errata"
+
+config BT1_ERRATA_JR_LS_BUG
+	bool "Fix load/store bonding and JR prediction bug"
+	help
+	  Early Baikal-T1 chips had problems when load/store bonding and JR
+	  prediction were enabled. Switch these features off if you are using
+	  the engineering version of the chip.
+
+	  If unsure, say N.
+
+config BT1_ERRATA_GMAC_SPEED_INV_BUG
+	bool "Fix DW GMAC 10/100Mbit link speed bug"
+	help
+	  DW GMAC on early Baikal-T1 chip releases had an inverted 10/100Mbit
+	  MAC speed settings. So when 10Mbit link is requested then 100Mbit MAC
+	  link speed should be setup and vise-versa.
+
+	  If unsure, say N.
+
+endmenu
+
+endif # MIPS_BAIKAL_T1

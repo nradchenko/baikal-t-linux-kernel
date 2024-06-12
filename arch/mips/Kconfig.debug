@@ -138,6 +138,7 @@ config MIPS_CPS_NS16550
 config MIPS_CPS_NS16550_BASE
 	hex "UART Base Address"
 	default 0x1b0003f8 if MIPS_MALTA
+	default 0x1f04a000 if MIPS_BAIKAL_T1
 	default 0
 	help
 	  The base address of the ns16550 compatible UART on which to output
@@ -147,6 +148,7 @@ config MIPS_CPS_NS16550_BASE
 
 config MIPS_CPS_NS16550_SHIFT
 	int "UART Register Shift"
+	default 2 if MIPS_BAIKAL_T1
 	default 0
 	help
 	  The number of bits to shift ns16550 register indices by in order to
@@ -155,6 +157,7 @@ config MIPS_CPS_NS16550_SHIFT
 
 config MIPS_CPS_NS16550_WIDTH
 	int "UART Register Width"
+	default 4 if MIPS_BAIKAL_T1
 	default 1
 	help
 	  ns16550 registers width. UART registers IO access methods will be

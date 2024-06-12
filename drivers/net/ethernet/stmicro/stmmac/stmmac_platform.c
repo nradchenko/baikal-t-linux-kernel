@@ -40,6 +40,7 @@ static int dwmac1000_validate_mcast_bins(struct device *dev, int mcast_bins)
 	int x = mcast_bins;
 
 	switch (x) {
+	case 0:
 	case HASH_TABLE_SIZE:
 	case 128:
 	case 256:
@@ -96,7 +97,8 @@ static struct stmmac_axi *stmmac_axi_setup(struct platform_device *pdev)
 	struct device_node *np;
 	struct stmmac_axi *axi;
 
-	np = of_parse_phandle(pdev->dev.of_node, "snps,axi-config", 0);
+	np = of_parse_phandle(pdev->dev.of_node, "snps,axi-config", 0) ?:
+	     of_get_child_by_name(pdev->dev.of_node, "axi-bus-config");
 	if (!np)
 		return NULL;
 
@@ -151,11 +153,13 @@ static int stmmac_mtl_setup(struct platform_device *pdev,
 	plat->rx_queues_cfg[0].mode_to_use = MTL_QUEUE_DCB;
 	plat->tx_queues_cfg[0].mode_to_use = MTL_QUEUE_DCB;
 
-	rx_node = of_parse_phandle(pdev->dev.of_node, "snps,mtl-rx-config", 0);
+	rx_node = of_parse_phandle(pdev->dev.of_node, "snps,mtl-rx-config", 0) ?:
+		  of_get_child_by_name(pdev->dev.of_node, "rx-queues-config");
 	if (!rx_node)
 		return ret;
 
-	tx_node = of_parse_phandle(pdev->dev.of_node, "snps,mtl-tx-config", 0);
+	tx_node = of_parse_phandle(pdev->dev.of_node, "snps,mtl-tx-config", 0) ?:
+		  of_get_child_by_name(pdev->dev.of_node, "tx-queues-config");
 	if (!tx_node) {
 		of_node_put(rx_node);
 		return ret;
@@ -661,6 +665,9 @@ EXPORT_SYMBOL_GPL(stmmac_remove_config_dt);
 int stmmac_get_platform_resources(struct platform_device *pdev,
 				  struct stmmac_resources *stmmac_res)
 {
+	char irq_name[IFNAMSIZ];
+	int irq, i;
+
 	memset(stmmac_res, 0, sizeof(*stmmac_res));
 
 	/* Get IRQ information early to have an ability to ask for deferred
@@ -692,6 +699,27 @@ int stmmac_get_platform_resources(struct platform_device *pdev,
 		if (stmmac_res->lpi_irq == -EPROBE_DEFER)
 			return -EPROBE_DEFER;
 		dev_info(&pdev->dev, "IRQ eth_lpi not found\n");
+	}
+
+	/* Request optional MTL per-queue IRQs. Note in fact these are the
+	 * DMA per-channel IRQs, the driver just maps them one-on-one.
+	 */
+	for (i = 0; i < MTL_MAX_RX_QUEUES; i++) {
+		snprintf(irq_name, IFNAMSIZ, "dma_rx%d", i);
+		irq = platform_get_irq_byname_optional(pdev, irq_name);
+		if (irq < 0)
+			break;
+
+		stmmac_res->rx_irq[i] = irq;
+	}
+
+	for (i = 0; i < MTL_MAX_TX_QUEUES; i++) {
+		snprintf(irq_name, IFNAMSIZ, "dma_tx%d", i);
+		irq = platform_get_irq_byname_optional(pdev, irq_name);
+		if (irq < 0)
+			break;
+
+		stmmac_res->tx_irq[i] = irq;
 	}
 
 	stmmac_res->addr = devm_platform_ioremap_resource(pdev, 0);

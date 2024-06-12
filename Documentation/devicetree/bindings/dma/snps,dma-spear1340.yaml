@@ -21,7 +21,7 @@ properties:
           - enum:
               - renesas,r9a06g032-dma
           - const: renesas,rzn1-dma
-
+      - const: baikal,bt1-dmac
 
   "#dma-cells":
     minimum: 3

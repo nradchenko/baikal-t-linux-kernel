@@ -206,6 +206,7 @@ struct plat_stmmacenet_data {
 	int rx_coe;
 	int bugged_jumbo;
 	int pmt;
+	int sma;
 	int force_sf_dma_mode;
 	int force_thresh_dma_mode;
 	int riwt_off;
@@ -231,6 +232,8 @@ struct plat_stmmacenet_data {
 	void (*exit)(struct platform_device *pdev, void *priv);
 	struct mac_device_info *(*setup)(void *priv);
 	int (*clks_config)(void *priv, bool enabled);
+	int (*bus_reset)(void *priv);
+	int (*swr_reset)(void *priv);
 	int (*crosststamp)(ktime_t *device, struct system_counterval_t *system,
 			   void *ctx);
 	void (*dump_debug_regs)(void *priv);

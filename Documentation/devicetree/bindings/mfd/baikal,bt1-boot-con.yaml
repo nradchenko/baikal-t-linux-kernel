@@ -1,0 +1,112 @@
+# SPDX-License-Identifier: (GPL-2.0 OR BSD-2-Clause)
+# Copyright (C) 2022 BAIKAL ELECTRONICS, JSC
+%YAML 1.2
+---
+$id: "http://devicetree.org/schemas/mfd/baikal,bt1-boot-con.yaml#"
+$schema: "http://devicetree.org/meta-schemas/core.yaml#"
+
+title: Baikal-T1 SoC Boot Controller
+
+maintainers:
+  - Serge Semin <fancer.lancer@gmail.com>
+
+description:
+  Baikal-T1 SoC is equipped with a Boot Controller which is responsible for
+  the SoC proper boot up procedure. Depending on the external pin state the
+  system can boot up either from the internal ROM or from the externally attached
+  SPI flash (at least of 16MB) or from the internal SRAM (the 64KB of executional
+  code is pre-loaded from the external SPI flash).
+
+allOf:
+  - $ref: /schemas/mfd/syscon.yaml#
+
+properties:
+  compatible:
+    items:
+      - const: baikal,bt1-boot-con
+      - const: syscon
+      - const: simple-mfd
+
+  reg:
+    items:
+      - description:
+          Baikal-T1 Boot Controller CSR space. It doesn't include many
+          settings':' corrent boot mode, SPI controller access mux, SRAM
+          access mux and device ID.
+      - description: Mirrored first 4MB of the boot SPI flash memory
+
+  reg-names:
+    items:
+      - const: boot
+      - const: mirror
+
+  "#address-cells":
+    const: 1
+
+  "#size-cells":
+    const: 1
+
+  ranges: true
+
+  little-endian: true
+
+  mux-controller:
+    $ref: /schemas/mux/reg-mux.yaml#
+
+  rom@1bfc0000:
+    $ref: /schemas/mtd/mtd-physmap.yaml#
+
+  spi@1f040100:
+    $ref: /schemas/spi/snps,dw-apb-ssi.yaml#
+
+required:
+  - compatible
+  - reg
+
+unevaluatedProperties: false
+
+examples:
+  - |
+    syscon@1f04d000 {
+      compatible = "baikal,bt1-boot-con", "syscon", "simple-mfd";
+      reg = <0x1f040000 0x1000>,
+            <0x1fc00000 0x400000>;
+      reg-names = "boot", "mirror";
+      #address-cells = <1>;
+      #size-cells = <1>;
+      ranges;
+
+      little-endian;
+      reg-io-width = <4>;
+
+      mux-controller {
+        compatible = "mmio-mux";
+        #mux-control-cells = <1>;
+
+        mux-reg-masks = <0x0 0x100>, <0x4 0x1>;
+        idle-states = <0x1>, <0x0>;
+      };
+
+      rom@1bfc0000 {
+        compatible = "baikal,bt1-int-rom", "mtd-rom";
+        reg = <0x1bfc0000 0x10000>;
+
+        no-unaligned-direct-access;
+        bank-width = <4>;
+      };
+
+      spi@1f040100 {
+        compatible = "baikal,bt1-sys-ssi";
+        reg = <0x1f040100 0x900>,
+              <0x1c000000 0x1000000>;
+        reg-names = "config", "map";
+        #address-cells = <1>;
+        #size-cells = <0>;
+
+        mux-controls = <&boot_mux 0>;
+
+        clocks = <&ccu_sys 1>;
+        clock-names = "ssi_clk";
+      };
+    };
+...

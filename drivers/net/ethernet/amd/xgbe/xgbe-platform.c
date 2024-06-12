@@ -126,6 +126,7 @@
 #include <linux/of_address.h>
 #include <linux/of_platform.h>
 #include <linux/of_device.h>
+#include <linux/of_mdio.h>
 #include <linux/clk.h>
 #include <linux/property.h>
 #include <linux/acpi.h>
@@ -296,38 +297,18 @@ static struct xgbe_version_data *xgbe_get_vdata(struct xgbe_prv_data *pdata)
 			       : xgbe_of_vdata(pdata);
 }
 
-static int xgbe_platform_probe(struct platform_device *pdev)
+static int xgbe_init_function_plat_amd(struct xgbe_prv_data *pdata)
 {
-	struct xgbe_prv_data *pdata;
-	struct device *dev = &pdev->dev;
+	unsigned int phy_memnum, phy_irqnum, dma_irqnum, dma_irqend;
+	struct platform_device *pdev = pdata->platdev;
 	struct platform_device *phy_pdev;
-	const char *phy_mode;
-	unsigned int phy_memnum, phy_irqnum;
-	unsigned int dma_irqnum, dma_irqend;
-	enum dev_dma_attr attr;
+	struct device *dev = pdata->dev;
 	int ret;
-
-	pdata = xgbe_alloc_pdata(dev);
-	if (IS_ERR(pdata)) {
-		ret = PTR_ERR(pdata);
-		goto err_alloc;
-	}
-
-	pdata->platdev = pdev;
-	pdata->adev = ACPI_COMPANION(dev);
-	platform_set_drvdata(pdev, pdata);
-
-	/* Check if we should use ACPI or DT */
-	pdata->use_acpi = dev->of_node ? 0 : 1;
-
-	/* Get the version data */
-	pdata->vdata = xgbe_get_vdata(pdata);
 
 	phy_pdev = xgbe_get_phy_pdev(pdata);
 	if (!phy_pdev) {
 		dev_err(dev, "unable to obtain phy device\n");
-		ret = -EINVAL;
-		goto err_phydev;
+		return -EINVAL;
 	}
 	pdata->phy_platdev = phy_pdev;
 	pdata->phy_dev = &phy_pdev->dev;
@@ -400,28 +381,6 @@ static int xgbe_platform_probe(struct platform_device *pdev)
 	if (netif_msg_probe(pdata))
 		dev_dbg(dev, "sir1_regs  = %p\n", pdata->sir1_regs);
 
-	/* Retrieve the MAC address */
-	ret = device_property_read_u8_array(dev, XGBE_MAC_ADDR_PROPERTY,
-					    pdata->mac_addr,
-					    sizeof(pdata->mac_addr));
-	if (ret || !is_valid_ether_addr(pdata->mac_addr)) {
-		dev_err(dev, "invalid %s property\n", XGBE_MAC_ADDR_PROPERTY);
-		if (!ret)
-			ret = -EINVAL;
-		goto err_io;
-	}
-
-	/* Retrieve the PHY mode - it must be "xgmii" */
-	ret = device_property_read_string(dev, XGBE_PHY_MODE_PROPERTY,
-					  &phy_mode);
-	if (ret || strcmp(phy_mode, phy_modes(PHY_INTERFACE_MODE_XGMII))) {
-		dev_err(dev, "invalid %s property\n", XGBE_PHY_MODE_PROPERTY);
-		if (!ret)
-			ret = -EINVAL;
-		goto err_io;
-	}
-	pdata->phy_mode = PHY_INTERFACE_MODE_XGMII;
-
 	/* Check for per channel interrupt support */
 	if (device_property_present(dev, XGBE_DMA_IRQS_PROPERTY)) {
 		pdata->per_channel_irq = 1;
@@ -435,29 +394,6 @@ static int xgbe_platform_probe(struct platform_device *pdev)
 		ret = xgbe_of_support(pdata);
 	if (ret)
 		goto err_io;
-
-	/* Set the DMA coherency values */
-	attr = device_get_dma_attr(dev);
-	if (attr == DEV_DMA_NOT_SUPPORTED) {
-		dev_err(dev, "DMA is not supported");
-		ret = -ENODEV;
-		goto err_io;
-	}
-	pdata->coherent = (attr == DEV_DMA_COHERENT);
-	if (pdata->coherent) {
-		pdata->arcr = XGBE_DMA_OS_ARCR;
-		pdata->awcr = XGBE_DMA_OS_AWCR;
-	} else {
-		pdata->arcr = XGBE_DMA_SYS_ARCR;
-		pdata->awcr = XGBE_DMA_SYS_AWCR;
-	}
-
-	/* Set the maximum fifo amounts */
-	pdata->tx_max_fifo_size = pdata->vdata->tx_max_fifo_size;
-	pdata->rx_max_fifo_size = pdata->vdata->rx_max_fifo_size;
-
-	/* Set the hardware channel and queue counts */
-	xgbe_set_counts(pdata);
 
 	/* Always have XGMAC and XPCS (auto-negotiation) interrupts */
 	pdata->irq_count = 2;
@@ -491,6 +427,228 @@ static int xgbe_platform_probe(struct platform_device *pdev)
 		goto err_io;
 	pdata->an_irq = ret;
 
+	return 0;
+
+err_io:
+	platform_device_put(phy_pdev);
+
+	return ret;
+}
+
+static void xgbe_init_function_disclk_baikal(void *data)
+{
+	struct xgbe_prv_data *pdata = data;
+
+	clk_disable_unprepare(pdata->sysclk);
+}
+
+static int xgbe_init_function_plat_baikal(struct xgbe_prv_data *pdata)
+{
+	struct platform_device *pdev = pdata->platdev;
+	struct device *dev = pdata->dev;
+	struct device_node *phy_node;
+	struct mdio_device *mdio_dev;
+	int ret;
+
+	phy_node = of_parse_phandle(dev->of_node, "phy-handle", 0);
+	if (!phy_node) {
+		dev_err(dev, "unable to obtain phy node\n");
+		return -ENODEV;
+	}
+
+	/* Nothing more sophisticated available at the moment... */
+	mdio_dev = of_mdio_find_device(phy_node);
+	of_node_put(phy_node);
+	if (!mdio_dev) {
+		dev_err_probe(dev, -EPROBE_DEFER, "unable to obtain mdio device\n");
+		return -EPROBE_DEFER;
+	}
+
+	pdata->phy_platdev = NULL;
+	pdata->phy_dev = &mdio_dev->dev;
+
+	/* Obtain the CSR regions of the device */
+	pdata->xgmac_regs = devm_platform_ioremap_resource_byname(pdev, "stmmaceth");
+	if (IS_ERR(pdata->xgmac_regs)) {
+		dev_err(dev, "xgmac ioremap failed\n");
+		ret = PTR_ERR(pdata->xgmac_regs);
+		goto err_io;
+	}
+	if (netif_msg_probe(pdata))
+		dev_dbg(dev, "xgmac_regs = %p\n", pdata->xgmac_regs);
+
+	pdata->xpcs_regs = devm_platform_ioremap_resource_byname(pdev, "xpcs");
+	if (IS_ERR(pdata->xpcs_regs)) {
+		dev_err(dev, "xpcs ioremap failed\n");
+		ret = PTR_ERR(pdata->xpcs_regs);
+		goto err_io;
+	}
+	if (netif_msg_probe(pdata))
+		dev_dbg(dev, "xpcs_regs  = %p\n", pdata->xpcs_regs);
+
+	/* Obtain the platform clocks setting */
+	pdata->apbclk = devm_clk_get(dev, "pclk");
+	if (IS_ERR(pdata->apbclk)) {
+		dev_err(dev, "apb devm_clk_get failed\n");
+		ret = PTR_ERR(pdata->apbclk);
+		goto err_io;
+	}
+
+	pdata->sysclk = devm_clk_get(dev, "stmmaceth");
+	if (IS_ERR(pdata->sysclk)) {
+		dev_err(dev, "dma devm_clk_get failed\n");
+		ret = PTR_ERR(pdata->sysclk);
+		goto err_io;
+	}
+	pdata->sysclk_rate = clk_get_rate(pdata->sysclk);
+
+	pdata->ptpclk = devm_clk_get(dev, "ptp_ref");
+	if (IS_ERR(pdata->ptpclk)) {
+		dev_err(dev, "ptp devm_clk_get failed\n");
+		ret = PTR_ERR(pdata->ptpclk);
+		goto err_io;
+	}
+	pdata->ptpclk_rate = clk_get_rate(pdata->ptpclk);
+
+	pdata->refclk = devm_clk_get(dev, "tx");
+	if (IS_ERR(pdata->refclk)) {
+		dev_err(dev, "ref devm_clk_get failed\n");
+		ret = PTR_ERR(pdata->refclk);
+		goto err_io;
+	}
+
+	/* Even though it's claimed that the CSR clock source is different from
+	 * the application clock the CSRs are still unavailable until the DMA
+	 * clock signal is enabled.
+	 */
+	ret = clk_prepare_enable(pdata->sysclk);
+	if (ret) {
+		dev_err(dev, "sys clock enable failed\n");
+		goto err_io;
+	}
+
+	ret = devm_add_action_or_reset(dev, xgbe_init_function_disclk_baikal, pdata);
+	if (ret) {
+		dev_err(dev, "sys clock undo registration failed\n");
+		goto err_io;
+	}
+
+	/* Forget about the per-channel IRQs for now... */
+	pdata->per_channel_irq = 0; // 1
+	pdata->channel_irq_mode = XGBE_IRQ_MODE_EDGE; // XGBE_IRQ_MODE_LEVEL;
+
+	pdata->irq_count = 1;
+
+	ret = platform_get_irq_byname(pdev, "macirq");
+	if (ret < 0)
+		goto err_io;
+	pdata->dev_irq = ret;
+	pdata->an_irq = pdata->dev_irq;
+
+	return 0;
+
+err_io:
+	put_device(pdata->phy_dev);
+
+	return ret;
+}
+
+static int xgbe_platform_probe(struct platform_device *pdev)
+{
+	struct xgbe_prv_data *pdata;
+	struct device *dev = &pdev->dev;
+	const char *phy_mode;
+	enum dev_dma_attr attr;
+	int ret;
+
+	pdata = xgbe_alloc_pdata(dev);
+	if (IS_ERR(pdata)) {
+		ret = PTR_ERR(pdata);
+		goto err_alloc;
+	}
+
+	pdata->platdev = pdev;
+	pdata->adev = ACPI_COMPANION(dev);
+	platform_set_drvdata(pdev, pdata);
+
+	/* Check if we should use ACPI or DT */
+	pdata->use_acpi = dev->of_node ? 0 : 1;
+
+	/* Get the version data */
+	pdata->vdata = xgbe_get_vdata(pdata);
+
+	/* Platform-specific resources setup */
+	ret = pdata->vdata->init_function_plat_impl(pdata);
+	if (ret)
+		goto err_plat;
+
+	/* Activate basic clocks */
+	ret = clk_prepare_enable(pdata->apbclk);
+	if (ret) {
+		dev_err(dev, "apb clock enable failed\n");
+		goto err_apb;
+	}
+
+	ret = clk_prepare_enable(pdata->refclk);
+	if (ret) {
+		dev_err(dev, "ref clock enable failed\n");
+		goto err_ref;
+	}
+
+	/* Retrieve the MAC address */
+	ret = device_property_read_u8_array(dev, XGBE_MAC_ADDR_PROPERTY,
+					    pdata->mac_addr,
+					    sizeof(pdata->mac_addr));
+	if (ret || !is_valid_ether_addr(pdata->mac_addr)) {
+		dev_err(dev, "invalid %s property\n", XGBE_MAC_ADDR_PROPERTY);
+		if (!ret)
+			ret = -EINVAL;
+		goto err_io;
+	}
+
+	/* Retrieve the PHY mode - "xgmii", "10gbase-r" or "xaui"/"10gbase-x" */
+	ret = device_property_read_string(dev, XGBE_PHY_MODE_PROPERTY,
+					  &phy_mode);
+	if (ret) {
+		dev_err(dev, "failed to read %s property\n", XGBE_PHY_MODE_PROPERTY);
+		goto err_io;
+	} else if (!strcmp(phy_mode, phy_modes(PHY_INTERFACE_MODE_XGMII))) {
+		pdata->phy_mode = PHY_INTERFACE_MODE_XGMII;
+	} else if (!strcmp(phy_mode, phy_modes(PHY_INTERFACE_MODE_10GBASER))) {
+		pdata->phy_mode = PHY_INTERFACE_MODE_10GBASER;
+	} else if (!strcmp(phy_mode, phy_modes(PHY_INTERFACE_MODE_XAUI))) {
+		pdata->phy_mode = PHY_INTERFACE_MODE_XAUI;
+	} else if (!strcmp(phy_mode, phy_modes(PHY_INTERFACE_MODE_10GBASEX))) {
+		pdata->phy_mode = PHY_INTERFACE_MODE_10GBASEX;
+	} else {
+		ret = -EINVAL;
+		dev_err(dev, "invalid %s property\n", XGBE_PHY_MODE_PROPERTY);
+		goto err_io;
+	}
+
+	/* Set the DMA coherency values */
+	attr = device_get_dma_attr(dev);
+	if (attr == DEV_DMA_NOT_SUPPORTED) {
+		dev_err(dev, "DMA is not supported");
+		ret = -ENODEV;
+		goto err_io;
+	}
+	pdata->coherent = (attr == DEV_DMA_COHERENT);
+	if (pdata->coherent) {
+		pdata->arcr = XGBE_DMA_OS_ARCR;
+		pdata->awcr = XGBE_DMA_OS_AWCR;
+	} else {
+		pdata->arcr = XGBE_DMA_SYS_ARCR;
+		pdata->awcr = XGBE_DMA_SYS_AWCR;
+	}
+
+	/* Set the maximum fifo amounts */
+	pdata->tx_max_fifo_size = pdata->vdata->tx_max_fifo_size;
+	pdata->rx_max_fifo_size = pdata->vdata->rx_max_fifo_size;
+
+	/* Set the hardware channel and queue counts */
+	xgbe_set_counts(pdata);
+
 	/* Configure the netdev resource */
 	ret = xgbe_config_netdev(pdata);
 	if (ret)
@@ -501,9 +659,15 @@ static int xgbe_platform_probe(struct platform_device *pdev)
 	return 0;
 
 err_io:
-	platform_device_put(phy_pdev);
+	clk_disable_unprepare(pdata->refclk);
 
-err_phydev:
+err_ref:
+	clk_disable_unprepare(pdata->apbclk);
+
+err_apb:
+	put_device(pdata->phy_dev);
+
+err_plat:
 	xgbe_free_pdata(pdata);
 
 err_alloc:
@@ -518,7 +682,11 @@ static int xgbe_platform_remove(struct platform_device *pdev)
 
 	xgbe_deconfig_netdev(pdata);
 
-	platform_device_put(pdata->phy_platdev);
+	clk_disable_unprepare(pdata->refclk);
+
+	clk_disable_unprepare(pdata->apbclk);
+
+	put_device(pdata->phy_dev);
 
 	xgbe_free_pdata(pdata);
 
@@ -573,10 +741,24 @@ static int xgbe_platform_resume(struct device *dev)
 #endif /* CONFIG_PM_SLEEP */
 
 static const struct xgbe_version_data xgbe_v1 = {
+	.init_function_plat_impl	= xgbe_init_function_plat_amd,
 	.init_function_ptrs_phy_impl	= xgbe_init_function_ptrs_phy_v1,
 	.xpcs_access			= XGBE_XPCS_ACCESS_V1,
 	.tx_max_fifo_size		= 81920,
 	.rx_max_fifo_size		= 81920,
+	.tx_tstamp_workaround		= 1,
+};
+
+static const struct xgbe_version_data xgbe_v3 = {
+	.init_function_plat_impl	= xgbe_init_function_plat_baikal,
+	.init_function_ptrs_phy_impl	= xgbe_init_function_ptrs_phy_v3,
+	.xpcs_access			= XGBE_XPCS_ACCESS_V1,
+	.tx_max_fifo_size		= 32768,
+	.rx_max_fifo_size		= 32768,
+	.blen				= DMA_SBMR_BLEN_16,
+	.pbl				= DMA_PBL_256,
+	.rd_osr_limit			= 8,
+	.wr_osr_limit			= 8,
 	.tx_tstamp_workaround		= 1,
 };
 
@@ -594,6 +776,8 @@ MODULE_DEVICE_TABLE(acpi, xgbe_acpi_match);
 static const struct of_device_id xgbe_of_match[] = {
 	{ .compatible = "amd,xgbe-seattle-v1a",
 	  .data = &xgbe_v1 },
+	{ .compatible = "amd,bt1-xgmac",
+	  .data = &xgbe_v3 },
 	{},
 };
 

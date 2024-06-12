@@ -1027,11 +1027,16 @@ struct xgbe_hw_features {
 };
 
 struct xgbe_version_data {
+	int (*init_function_plat_impl)(struct xgbe_prv_data *);
 	void (*init_function_ptrs_phy_impl)(struct xgbe_phy_if *);
 	enum xgbe_xpcs_access xpcs_access;
 	unsigned int mmc_64bit;
 	unsigned int tx_max_fifo_size;
 	unsigned int rx_max_fifo_size;
+	unsigned int blen;
+	unsigned int pbl;
+	unsigned int rd_osr_limit;
+	unsigned int wr_osr_limit;
 	unsigned int tx_tstamp_workaround;
 	unsigned int ecc_support;
 	unsigned int i2c_support;
@@ -1207,6 +1212,8 @@ struct xgbe_prv_data {
 	unsigned long active_vlans[BITS_TO_LONGS(VLAN_N_VID)];
 
 	/* Device clocks */
+	struct clk *apbclk;
+	struct clk *refclk;
 	struct clk *sysclk;
 	unsigned long sysclk_rate;
 	struct clk *ptpclk;
@@ -1334,6 +1341,7 @@ void xgbe_init_function_ptrs_dev(struct xgbe_hw_if *);
 void xgbe_init_function_ptrs_phy(struct xgbe_phy_if *);
 void xgbe_init_function_ptrs_phy_v1(struct xgbe_phy_if *);
 void xgbe_init_function_ptrs_phy_v2(struct xgbe_phy_if *);
+void xgbe_init_function_ptrs_phy_v3(struct xgbe_phy_if *);
 void xgbe_init_function_ptrs_desc(struct xgbe_desc_if *);
 void xgbe_init_function_ptrs_i2c(struct xgbe_i2c_if *);
 const struct net_device_ops *xgbe_get_netdev_ops(void);

@@ -142,7 +142,6 @@ static void dwmac1000_set_filter(struct mac_device_info *hw,
 {
 	void __iomem *ioaddr = (void __iomem *)dev->base_addr;
 	unsigned int value = 0;
-	unsigned int perfect_addr_number = hw->unicast_filter_entries;
 	u32 mc_filter[8];
 	int mcbitslog2 = hw->mcast_bits_log2;
 
@@ -158,7 +157,7 @@ static void dwmac1000_set_filter(struct mac_device_info *hw,
 	} else if (!netdev_mc_empty(dev) && (mcbitslog2 == 0)) {
 		/* Fall back to all multicast if we've no filter */
 		value = GMAC_FRAME_FILTER_PM;
-	} else if (!netdev_mc_empty(dev)) {
+	} else if (!netdev_mc_empty(dev) && dev->flags & IFF_MULTICAST) {
 		struct netdev_hw_addr *ha;
 
 		/* Hash filter for multicast */
@@ -185,7 +184,7 @@ static void dwmac1000_set_filter(struct mac_device_info *hw,
 	dwmac1000_set_mchash(ioaddr, mc_filter, mcbitslog2);
 
 	/* Handle multiple unicast addresses (perfect filtering) */
-	if (netdev_uc_count(dev) > perfect_addr_number)
+	if (netdev_uc_count(dev) > hw->unicast_filter_entries - 1)
 		/* Switch to promiscuous mode if more than unicast
 		 * addresses are requested than supported by hardware.
 		 */
@@ -201,10 +200,9 @@ static void dwmac1000_set_filter(struct mac_device_info *hw,
 			reg++;
 		}
 
-		while (reg < perfect_addr_number) {
+		for (; reg < hw->unicast_filter_entries; reg++) {
 			writel(0, ioaddr + GMAC_ADDR_HIGH(reg));
 			writel(0, ioaddr + GMAC_ADDR_LOW(reg));
-			reg++;
 		}
 	}
 

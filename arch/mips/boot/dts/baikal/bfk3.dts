@@ -1,0 +1,362 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * Copyright (C) 2022 BAIKAL ELECTRONICS, JSC
+ *
+ * Baikal Electronics BFK v3.x evaluation board device tree
+ */
+
+/dts-v1/;
+
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/interrupt-controller/irq.h>
+
+#include "bt1.dtsi"
+#include "krkx4-mv-sfp.dtsi"
+
+/ {
+	model = "Baikal Electronics BFK v3.x Evaluation Board";
+	compatible = "baikal,bfk3", "baikal,bt1";
+
+	chosen {
+		bootargs = "console=ttyS0,115200n8 earlycon maxcpus=2";
+		stdout-path = "serial0:115200n8";
+
+		/* Bootloader may use these props to pass the initrd image */
+		linux,initrd-start = <0 0>;
+		linux,initrd-end   = <0 0>;
+	};
+
+	memory {
+		/*
+		 * Assume at least 512MB of RAM:
+		 * low memory - 128MB, high memory - 256MB.
+		 */
+		device_type = "memory";
+		reg = <0 0x00000000 0 0x08000000>,
+		      <0 0x20000000 0 0x10000000>;
+	};
+
+	clocks {
+		/*
+		 * SATA/PCIe/xGMAC reference clocks are provided by the
+		 * IDT 5P49V5901 which is out of the SoC reach and is
+		 * initialized by the embedded BMC.
+		 */
+		xgmac_ref_clk: clock-oscillator-vc5p1 {
+			compatible = "fixed-clock";
+			#clock-cells = <0>;
+			clock-frequency  = <156250000>;
+			clock-output-names = "xgmac156m";
+		};
+
+		pcie_ref_clk: clock-oscillator-vc5p3 {
+			compatible = "fixed-clock";
+			#clock-cells = <0>;
+			clock-frequency  = <100000000>;
+			clock-output-names = "pcie100m";
+		};
+
+		sata_ref_clk: clock-oscillator-vc5p4 {
+			compatible = "fixed-clock";
+			#clock-cells = <0>;
+			clock-frequency  = <100000000>;
+			clock-output-names = "sata100m";
+		};
+
+		usb_phy_clk: clock-oscillator-usb-phy {
+			compatible = "fixed-clock";
+			#clock-cells = <0>;
+			clock-frequency  = <24000000>;
+			clock-output-names = "usbphy24m";
+		};
+
+		gmac0_phy_clk: clock-oscillator-gmac0-phy {
+			compatible = "fixed-clock";
+			#clock-cells = <0>;
+			clock-frequency  = <25000000>;
+			clock-output-names = "gmac0phy25m";
+		};
+
+		gmac1_phy_clk: clock-oscillator-gmac1-phy {
+			compatible = "fixed-clock";
+			#clock-cells = <0>;
+			clock-frequency  = <25000000>;
+			clock-output-names = "gmac1phy25m";
+		};
+	};
+};
+
+&l2 {
+	status = "okay";
+};
+
+&i2c0 {
+	status = "okay";
+};
+
+&int_rom {
+	status = "okay";
+};
+
+&spi0 {
+	num-cs = <1>;
+
+	status = "okay";
+
+	/* Micron N25Q128A11 */
+	boot_flash: flash@0 {
+		compatible = "jedec,spi-nor";
+		#address-cells = <1>;
+		#size-cells = <1>;
+		reg = <0>;
+
+		spi-max-frequency = <25000000>;
+		m25p,fast-read;
+	};
+};
+
+&gpio0 {
+	status = "okay";
+};
+
+&gpio1 {
+	status = "okay";
+};
+
+&i2c1 {
+	status = "okay";
+
+	/* STM32F205VET-based Board Management Controller */
+	bmc: bmc@8 {
+		compatible = "baikal,bt1-bmc";
+		reg = <0x08>;
+	};
+};
+
+&i2c2 {
+	status = "okay";
+
+	spd: eeprom@50 {
+		compatible = "atmel,24c02";
+		reg = <0x50>;
+
+		pagesize = <8>;
+	};
+
+	/* Might be absent */
+	fw: eeprom@54 {
+		compatible = "atmel,24cs04";
+		reg = <0x54>;
+
+		pagesize = <8>;
+	};
+
+	rtc: rtc@56 {
+		compatible = "abracon,abeoz9";
+		reg = <0x56>;
+
+		trickle-resistor-ohms = <5000>;
+	};
+};
+
+&timer_dw0 {
+	status = "okay";
+};
+
+&timer_dw1 {
+	status = "okay";
+};
+
+&timer_dw2 {
+	status = "okay";
+};
+
+&uart0 {
+	status = "okay";
+};
+
+&uart1 {
+	status = "okay";
+};
+
+&wdt {
+	status = "okay";
+};
+
+&spi1 {
+	num-cs = <4>;
+
+	/*
+	 * XP20 port switches between CS0 and port1:0 chip-selects.
+	 * XP21 port switches between CS1 and port1:1 chip-selects.
+	 */
+	cs-gpios = <0>, <0>,
+		   <&port1 0 GPIO_ACTIVE_LOW>, <&port1 1 GPIO_ACTIVE_LOW>;
+
+	status = "okay";
+
+	/* Micron N25Q256A13EF */
+	test_flash11: flash@1 {
+		compatible = "jedec,spi-nor";
+		#address-cells = <1>;
+		#size-cells = <1>;
+		reg = <1>;
+
+		spi-max-frequency = <25000000>;
+		m25p,fast-read;
+	};
+
+	/* Micron N25Q256A13EF */
+	test_flash13: flash@3 {
+		compatible = "jedec,spi-nor";
+		#address-cells = <1>;
+		#size-cells = <1>;
+		reg = <3>;
+
+		spi-max-frequency = <25000000>;
+		m25p,fast-read;
+	};
+};
+
+&spi2 {
+	/* XP19 port switches between CS0 and port1:2 chip-selects */
+	cs-gpios = <0>, <&port1 2 GPIO_ACTIVE_LOW>;
+
+	status = "okay";
+};
+
+&pvt {
+	status = "okay";
+};
+
+&efuse {
+	status = "okay";
+};
+
+&pcie {
+	clocks = <&ccu_sys CCU_SYS_APB_CLK>,
+		 <&ccu_axi CCU_AXI_PCIE_M_CLK>,
+		 <&ccu_axi CCU_AXI_PCIE_S_CLK>,
+		 <&pcie_ref_clk>;
+	clock-names = "dbi", "mstr", "slv", "ref";
+
+	status = "okay";
+};
+
+&sram {
+	status = "okay";
+};
+
+&dma {
+	status = "okay";
+};
+
+&mc {
+	status = "okay";
+};
+
+&mc_phy {
+	status = "okay";
+};
+
+&sata {
+	clocks = <&ccu_sys CCU_SYS_APB_CLK>,
+		 <&ccu_axi CCU_AXI_SATA_CLK>,
+		 <&sata_ref_clk>;
+	clock-names = "pclk", "aclk", "ref";
+
+	status = "okay";
+};
+
+&sata0 {
+	hba-port-cap = <HBA_PORT_FBSCP>;
+
+	status = "okay";
+};
+
+&sata1 {
+	hba-port-cap = <HBA_PORT_FBSCP>;
+
+	status = "okay";
+};
+
+&xgmac_mi {
+	status = "disabled";
+};
+
+&xgmac_pcs {
+	clocks = <&ccu_sys CCU_SYS_XGMAC_REF_CLK>,
+		 <&xgmac_ref_clk>;
+	clock-names = "core", "pad";
+};
+
+&xgmac {
+	clocks = <&ccu_sys CCU_SYS_APB_CLK>,
+		 <&ccu_axi CCU_AXI_XGMAC_CLK>,
+		 <&ccu_sys CCU_SYS_XGMAC_PTP_CLK>,
+		 <&xgmac_ref_clk>;
+	clock-names = "pclk", "stmmaceth", "ptp_ref", "tx";
+
+	mac-address = [ 00 20 13 ba 1c a1 ];
+
+	status = "okay";
+};
+
+&hwa {
+	status = "okay";
+};
+
+&gmac0_mdio {
+	reset-delay-us = <10200>;
+	reset-post-delay-us = <1000>;
+
+	/* Micrel KSZ9031RNX */
+	gmac0_phy: ethernet-phy@3 {
+		compatible = "ethernet-phy-id0022.1620";
+		reg = <0x3>;
+
+		clocks = <&gmac0_phy_clk>;
+		clock-names = "ref";
+	};
+};
+
+&gmac0 {
+	mac-address = [ 00 26 58 80 01 02 ];
+
+	phy-handle = <&gmac0_phy>;
+
+	status = "okay";
+};
+
+&gmac1_mdio {
+	reset-delay-us = <10200>;
+	reset-post-delay-us = <1000>;
+
+	/* Micrel KSZ9031RNX */
+	gmac1_phy: ethernet-phy@3 {
+		compatible = "ethernet-phy-id0022.1620";
+		reg = <0x3>;
+
+		clocks = <&gmac1_phy_clk>;
+		clock-names = "ref";
+	};
+};
+
+&gmac1 {
+	mac-address = [ 00 26 58 80 01 03 ];
+
+	phy-handle = <&gmac1_phy>;
+
+	status = "okay";
+};
+
+&usb {
+	status = "okay";
+
+	ulpi {
+		phy {
+			clocks = <&usb_phy_clk>;
+			clock-names = "ref";
+		};
+	};
+};

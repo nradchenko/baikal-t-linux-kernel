@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: GPL-2.0
+subdir-$(CONFIG_MIPS_BAIKAL_T1)		+= baikal
 subdir-$(CONFIG_BMIPS_GENERIC)		+= brcm
 subdir-$(CONFIG_CAVIUM_OCTEON_SOC)	+= cavium-octeon
 subdir-$(CONFIG_FIT_IMAGE_FDT_MARDUK)   += img

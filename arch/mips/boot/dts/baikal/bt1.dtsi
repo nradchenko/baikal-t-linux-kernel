@@ -1,0 +1,1181 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * Copyright (C) 2022 BAIKAL ELECTRONICS, JSC
+ *
+ * Baikal-T1 SoC device tree
+ */
+
+#include <dt-bindings/dma/dw-dmac.h>
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/interrupt-controller/mips-gic.h>
+#include <dt-bindings/thermal/thermal.h>
+#include <dt-bindings/ata/ahci.h>
+
+#include <dt-bindings/clock/bt1-ccu.h>
+#include <dt-bindings/reset/bt1-ccu.h>
+#include <dt-bindings/soc/bt1-boot-mode.h>
+
+/ {
+	model = "Baikal-T1 SoC";
+	compatible = "baikal,bt1";
+	#address-cells = <2>;
+	#size-cells = <2>;
+
+	interrupt-parent = <&gic>;
+
+	aliases {
+		serial0 = &uart0;
+		serial1 = &uart1;
+		i2c0 = &i2c0;
+		i2c1 = &i2c1;
+		i2c2 = &i2c2;
+		spi0 = &spi0;
+		spi1 = &spi1;
+		spi2 = &spi2;
+		mc0 = &mc;
+		ethernet0 = &gmac0;
+		ethernet1 = &gmac1;
+		ethernet2 = &xgmac;
+	};
+
+	cpus {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		cpu-map {
+			cluster0 {
+				core0 {
+					cpu = <&cpu0>;
+				};
+
+				core1 {
+					cpu = <&cpu1>;
+				};
+			};
+		};
+
+		cpu0: cpu@0 {
+			compatible = "img,p5600";
+			device_type = "cpu";
+			reg = <0x0>;
+			#cooling-cells = <2>;
+
+			clocks = <&ccu_pll CCU_CPU_PLL>;
+			clock-names = "cpu_clk";
+
+			operating-points-v2 = <&cpu_opp>;
+		};
+
+		cpu1: cpu@1 {
+			compatible = "img,p5600";
+			device_type = "cpu";
+			reg = <0x1>;
+			#cooling-cells = <2>;
+
+			clocks = <&ccu_pll CCU_CPU_PLL>;
+			clock-names = "cpu_clk";
+
+			operating-points-v2 = <&cpu_opp>;
+		};
+	};
+
+	gic: gic@1bdc0000 {
+		compatible = "mti,gic";
+		reg = <0 0x1bdc0000 0 0x20000>;
+
+		interrupt-controller;
+		#interrupt-cells = <3>;
+		mti,reserved-ipi-vectors = <108 4>;
+
+		timer_gic: timer {
+			compatible = "mti,gic-timer";
+
+			interrupts = <GIC_LOCAL 1 IRQ_TYPE_NONE>;
+
+			clocks = <&ccu_pll CCU_CPU_PLL>;
+		};
+	};
+
+	cpc: cpc@1bde0000 {
+		compatible = "mti,mips-cpc";
+		reg = <0 0x1bde0000 0 0x8000>;
+	};
+
+	cdmm: cdmm@1bde8000 {
+		compatible = "mti,mips-cdmm";
+		reg = <0 0x1bde8000 0 0x8000>;
+	};
+
+	cm2: cm2@1fbf8000 {
+		compatible = "mti,mips-cm";
+		reg = <0 0x1fbf8000 0 0x8000>,
+		      <0 0x1fbf0000 0 0x1000>;
+		reg-names = "gcr", "l2sync";
+	};
+
+	/*
+	 * Note setting up too low CPU frequency may cause time-critical
+	 * applications not working correctly. For instance in order to have
+	 * the DW APB SSI memory interface (EEPROM-read and Tx-only) working
+	 * correctly with the whole CPU clock range defined below we had to
+	 * accordingly constraint the SPI bus speed.
+	 */
+	cpu_opp: opp-table {
+		compatible = "operating-points-v2";
+		opp-shared;
+
+		opp-300000000 {
+			opp-hz = /bits/ 64 <300000000>;
+			clock-latency-ns = <20000>;
+                };
+
+		opp-400000000 {
+			opp-hz = /bits/ 64 <400000000>;
+			clock-latency-ns = <20000>;
+                };
+
+		opp-500000000 {
+			opp-hz = /bits/ 64 <500000000>;
+			clock-latency-ns = <20000>;
+                };
+
+		opp-600000000 {
+			opp-hz = /bits/ 64 <600000000>;
+			clock-latency-ns = <20000>;
+                };
+
+		opp-700000000 {
+			opp-hz = /bits/ 64 <700000000>;
+			clock-latency-ns = <20000>;
+                };
+
+		opp-800000000 {
+			opp-hz = /bits/ 64 <800000000>;
+			clock-latency-ns = <20000>;
+                };
+
+		opp-900000000 {
+			opp-hz = /bits/ 64 <900000000>;
+			clock-latency-ns = <20000>;
+                };
+
+		opp-1000000000 {
+			opp-hz = /bits/ 64 <1000000000>;
+			clock-latency-ns = <20000>;
+                };
+
+		opp-1100000000 {
+			opp-hz = /bits/ 64 <1100000000>;
+			clock-latency-ns = <20000>;
+                };
+
+		opp-1200000000 {
+			opp-hz = /bits/ 64 <1200000000>;
+			clock-latency-ns = <20000>;
+                };
+	};
+
+	thermal-zones {
+		cpu-thermal {
+			polling-delay-passive = <250>;
+			polling-delay = <1000>;
+
+			thermal-sensors = <&pvt>;
+
+			trips {
+				cpu_alert0: trip0 {
+					temperature = <80000>;
+					hysteresis = <2000>;
+					type = "active";
+				};
+
+				cpu_alert1: trip1 {
+					temperature = <90000>;
+					hysteresis = <2000>;
+					type = "passive";
+				};
+
+				cpu_warn: trip2 {
+					temperature = <100000>;
+					hysteresis = <2000>;
+					type = "hot";
+				};
+
+				cpu_crit: trip3 {
+					temperature = <110000>;
+					hysteresis = <2000>;
+					type = "critical";
+				};
+			};
+
+			cooling-maps {
+				map-alert1 {
+					trip = <&cpu_alert1>;
+					cooling-device = <&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>,
+							 <&cpu1 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
+				};
+			};
+		};
+	};
+
+	/* External fixed reference clocks */
+	clocks {
+		ref_clk: clock-oscillator-ref {
+			compatible = "fixed-clock";
+			#clock-cells = <0>;
+			clock-frequency  = <25000000>;
+			clock-output-names = "ref25m";
+		};
+	};
+
+	apb: bus@1f059000 {
+		compatible = "baikal,bt1-apb", "simple-bus";
+		reg = <0 0x1f059000 0 0x1000>,
+		      <0 0x1d000000 0 0x2040000>;
+		reg-names = "ehb", "nodev";
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		ranges = <0x1bfc0000 0 0x1bfc0000 0x03c38000>,
+			 <0x1fc00000 0 0x1fc00000 0x00400000>;
+
+		interrupts = <GIC_SHARED 16 IRQ_TYPE_LEVEL_HIGH>;
+
+		clocks = <&ccu_sys CCU_SYS_APB_CLK>;
+		clock-names = "pclk";
+
+		resets = <&ccu_sys CCU_SYS_APB_RST>;
+		reset-names = "prst";
+
+		syscon: syscon@1f04d000 {
+			compatible = "baikal,bt1-sys-con", "syscon", "simple-mfd";
+			reg = <0x1f04d000 0x1000>;
+			reg-names = "sys";
+			#address-cells = <1>;
+			#size-cells = <1>;
+			ranges;
+
+			little-endian;
+			reg-io-width = <4>;
+
+			ccu_pll: clock-controller@1f04d000 {
+				compatible = "baikal,bt1-ccu-pll";
+				reg = <0x1f04d000 0x028>;
+				#clock-cells = <1>;
+
+				clocks = <&ref_clk>;
+				clock-names = "ref_clk";
+			};
+
+			ccu_axi: clock-controller@1f04d030 {
+				compatible = "baikal,bt1-ccu-axi";
+				reg = <0x1f04d030 0x030>;
+				#clock-cells = <1>;
+				#reset-cells = <1>;
+
+				clocks = <&ccu_pll CCU_SATA_PLL>,
+					 <&ccu_pll CCU_PCIE_PLL>,
+					 <&ccu_pll CCU_ETH_PLL>;
+				clock-names = "sata_clk", "pcie_clk", "eth_clk";
+			};
+
+			ccu_sys: clock-controller@1f04d060 {
+				compatible = "baikal,bt1-ccu-sys";
+				reg = <0x1f04d060 0x0a0>;
+				#clock-cells = <1>;
+				#reset-cells = <1>;
+
+				clocks = <&ref_clk>,
+					 <&ccu_pll CCU_SATA_PLL>,
+					 <&ccu_pll CCU_PCIE_PLL>,
+					 <&ccu_pll CCU_ETH_PLL>;
+				clock-names = "ref_clk", "sata_clk", "pcie_clk",
+					      "eth_clk";
+			};
+
+			l2: l2@1f04d028 {
+				compatible = "baikal,bt1-l2-ctl";
+				reg = <0x1f04d028 0x004>;
+
+				baikal,l2-ws-latency = <0>;
+				baikal,l2-tag-latency = <0>;
+				baikal,l2-data-latency = <1>;
+
+				status = "disabled";
+			};
+
+			reboot {
+				compatible = "syscon-reboot";
+				offset = <0x118>;
+
+				mask = <0x1>;
+				value = <0x1>;
+
+				status = "disabled";
+			};
+
+			reboot-mode {
+				compatible = "syscon-reboot-mode";
+				offset = <0x154>;
+
+				mode-normal = <RCR_BOOT_NORMAL>;
+				mode-loader = <RCR_BOOT_LOADER>;
+				mode-recovery = <RCR_BOOT_RECOVERY>;
+			};
+
+			i2c0: i2c@1f04d100 {
+				compatible = "baikal,bt1-sys-i2c";
+				reg = <0x1f04d100 0x010>;
+				#address-cells = <1>;
+				#size-cells = <0>;
+
+				interrupts = <GIC_SHARED 32 IRQ_TYPE_LEVEL_HIGH>;
+
+				clocks = <&ccu_sys CCU_SYS_APB_CLK>;
+				clock-frequency = <400000>;
+
+				status = "disabled";
+			};
+		};
+
+		bootcon: syscon@1f040000 {
+			compatible = "baikal,bt1-boot-con", "syscon", "simple-mfd";
+			reg = <0x1f040000 0x1000>,
+			      <0x1fc00000 0x400000>;
+			reg-names = "boot", "mirror";
+			#address-cells = <1>;
+			#size-cells = <1>;
+			ranges;
+
+			little-endian;
+			reg-io-width = <4>;
+
+			boot_mux: mux-controller {
+				compatible = "mmio-mux";
+				#mux-control-cells = <1>;
+
+				mux-reg-masks = <0x0 0x100>, <0x4 0x1>;
+				idle-states = <0x1>, <0x0>;
+			};
+
+			int_rom: rom@1bfc0000 {
+				compatible = "baikal,bt1-int-rom", "mtd-rom";
+				reg = <0x1bfc0000 0x10000>;
+
+				no-unaligned-direct-access;
+				bank-width = <4>;
+
+				status = "disabled";
+			};
+
+			/*
+			 * Note that using the dirmap region stalls the APB bus
+			 * until an IO operation is finished. It may cause
+			 * significant lags in concurrent access to the system
+			 * MMIO, since each SPI flash dword read operation takes
+			 * at least 2.56 us to be finished (cmd + addr + data).
+			 */
+			spi0: spi@1f040100 {
+				compatible = "baikal,bt1-sys-ssi";
+				reg = <0x1f040100 0x900>,
+				      <0x1c000000 0x1000000>;
+				reg-names = "config", "map";
+				#address-cells = <1>;
+				#size-cells = <0>;
+
+				mux-controls = <&boot_mux 0>;
+
+				clocks = <&ccu_sys CCU_SYS_APB_CLK>;
+				clock-names = "ssi_clk";
+
+				status = "disabled";
+			};
+		};
+
+		gpio0: gpio@1f044000 {
+			compatible = "snps,dw-apb-gpio";
+			reg = <0x1f044000 0x1000>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			clocks = <&ccu_sys CCU_SYS_APB_CLK>,
+				 <&ccu_sys CCU_SYS_GPIO_CLK>;
+			clock-names = "bus", "db";
+
+			status = "disabled";
+
+			port0: gpio-port@0 {
+				compatible = "snps,dw-apb-gpio-port";
+				reg = <0>;
+
+				interrupts = <GIC_SHARED 19 IRQ_TYPE_LEVEL_HIGH>;
+				interrupt-controller;
+				#interrupt-cells = <2>;
+
+				gpio-controller;
+				#gpio-cells = <2>;
+				ngpios = <32>;
+			};
+		};
+
+		gpio1: gpio@1f045000 {
+			compatible = "snps,dw-apb-gpio";
+			reg = <0x1f045000 0x1000>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			clocks = <&ccu_sys CCU_SYS_APB_CLK>,
+				 <&ccu_sys CCU_SYS_GPIO_CLK>;
+			clock-names = "bus", "db";
+
+			status = "disabled";
+
+			port1: gpio-port@0 {
+				compatible = "snps,dw-apb-gpio-port";
+				reg = <0>;
+
+				gpio-controller;
+				#gpio-cells = <2>;
+				ngpios = <3>;
+			};
+		};
+
+		i2c1: i2c@1f046000 {
+			compatible = "snps,designware-i2c";
+			reg = <0x1f046000 0x1000>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			interrupts = <GIC_SHARED 33 IRQ_TYPE_LEVEL_HIGH>;
+
+			clocks = <&ccu_sys CCU_SYS_I2C1_CLK>,
+				 <&ccu_sys CCU_SYS_APB_CLK>;
+			clock-names = "ref", "pclk";
+			clock-frequency = <400000>;
+
+			dmas = <&dma 4 0 1 0xff>, <&dma 5 0 1 0xff>;
+			dma-names = "tx", "rx";
+
+			status = "disabled";
+		};
+
+		i2c2: i2c@1f047000 {
+			compatible = "snps,designware-i2c";
+			reg = <0x1f047000 0x1000>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			interrupts = <GIC_SHARED 34 IRQ_TYPE_LEVEL_HIGH>;
+
+			clocks = <&ccu_sys CCU_SYS_I2C2_CLK>,
+				 <&ccu_sys CCU_SYS_APB_CLK>;
+			clock-names = "ref", "pclk";
+			clock-frequency = <400000>;
+
+			dmas = <&dma 6 0 1 0xff>, <&dma 7 0 1 0xff>;
+			dma-names = "tx", "rx";
+
+			status = "disabled";
+		};
+
+		timer_dw0: timer@1f049000 {
+			compatible = "snps,dw-apb-timer";
+			reg = <0x1f049000 0x14>;
+
+			interrupts = <GIC_SHARED 24 IRQ_TYPE_LEVEL_HIGH>;
+
+			clocks = <&ccu_sys CCU_SYS_TIMER0_CLK>,
+				 <&ccu_sys CCU_SYS_APB_CLK>;
+			clock-names = "timer", "pclk";
+
+			status = "disabled";
+		};
+
+		timer_dw1: timer@1f049014 {
+			compatible = "snps,dw-apb-timer";
+			reg = <0x1f049014 0x14>;
+
+			interrupts = <GIC_SHARED 25 IRQ_TYPE_LEVEL_HIGH>;
+
+			clocks = <&ccu_sys CCU_SYS_TIMER1_CLK>,
+				 <&ccu_sys CCU_SYS_APB_CLK>;
+			clock-names = "timer", "pclk";
+
+			status = "disabled";
+		};
+
+		timer_dw2: timer@1f049028 {
+			compatible = "snps,dw-apb-timer";
+			reg = <0x1f049028 0x14>;
+
+			interrupts = <GIC_SHARED 26 IRQ_TYPE_LEVEL_HIGH>;
+
+			clocks = <&ccu_sys CCU_SYS_TIMER2_CLK>,
+				 <&ccu_sys CCU_SYS_APB_CLK>;
+			clock-names = "timer", "pclk";
+
+			status = "disabled";
+		};
+
+		uart0: serial@1f04a000 {
+			compatible = "snps,dw-apb-uart";
+			reg = <0x1f04a000 0x1000>;
+
+			interrupts = <GIC_SHARED 48 IRQ_TYPE_LEVEL_HIGH>;
+
+			clocks = <&ccu_sys CCU_SYS_UART_CLK>,
+				 <&ccu_sys CCU_SYS_APB_CLK>;
+			clock-names = "baudclk", "apb_pclk";
+
+			dmas = <&dma 0 0 1 0xff>, <&dma 1 0 1 0xff>;
+			dma-names = "tx", "rx";
+
+			dcd-override;
+			dsr-override;
+			cts-override;
+			ri-override;
+
+			/* earlycon settings. */
+			reg-io-width = <4>;
+			reg-shift = <2>;
+
+			status = "disabled";
+		};
+
+		uart1: serial@1f04b000 {
+			compatible = "snps,dw-apb-uart";
+			reg = <0x1f04b000 0x1000>;
+
+			interrupts = <GIC_SHARED 49 IRQ_TYPE_LEVEL_HIGH>;
+
+			clocks = <&ccu_sys CCU_SYS_UART_CLK>,
+				 <&ccu_sys CCU_SYS_APB_CLK>;
+			clock-names = "baudclk", "apb_pclk";
+
+			dmas = <&dma 2 0 1 0xff>, <&dma 3 0 1 0xff>;
+			dma-names = "tx", "rx";
+
+			/* earlycon settings. */
+			reg-io-width = <4>;
+			reg-shift = <2>;
+
+			status = "disabled";
+		};
+
+		wdt: watchdog@1f04c000 {
+			compatible = "snps,dw-wdt";
+			reg = <0x1f04c000 0x1000>;
+
+			interrupts = <GIC_SHARED 17 IRQ_TYPE_LEVEL_HIGH>;
+
+			clocks = <&ccu_sys CCU_SYS_WDT_CLK>,
+				 <&ccu_sys CCU_SYS_APB_CLK>;
+			clock-names = "tclk", "pclk";
+
+			/* Adjust ref-clock rate for better TOPs granularity */
+			assigned-clocks = <&ccu_sys CCU_SYS_WDT_CLK>;
+			assigned-clock-rates = <65534>;
+
+			snps,watchdog-tops = <0x000000ff 0x000001ff 0x000003ff
+					      0x000007ff 0x0000ffff 0x0001ffff
+					      0x0003ffff 0x0007ffff 0x000fffff
+					      0x001fffff 0x003fffff 0x007fffff
+					      0x00ffffff 0x01ffffff 0x03ffffff
+					      0x07ffffff>;
+
+			status = "disabled";
+		};
+
+		/*
+		 * It's highly recommended to use all DW APB SSI controllers
+		 * with GPIO-based CS, due to the native CS being automatically
+		 * asserted/de-asserted on transmissions. Such HW design isn't
+		 * that suitable for the kernel SPI subsystem, so GPIO-based CS
+		 * will help to prevent very nasty, hard-to-fix errors.
+		 */
+		spi1: spi@1f04e000 {
+			compatible = "baikal,bt1-ssi";
+			reg = <0x1f04e000 0x1000>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			interrupts = <GIC_SHARED 40 IRQ_TYPE_LEVEL_HIGH>;
+
+			clocks = <&ccu_sys CCU_SYS_APB_CLK>;
+			clock-names = "ssi_clk";
+
+			/*
+			 * Make sure Rx DMA channels have higher priority. Note
+			 * also that first two DW DMAC channels aren't suitable
+			 * for the well-balanced Tx and Rx SPI transfers.
+			 */
+			dmas = <&dma 8 0 1 0xe0>, <&dma 9 0 1 0x1c>;
+			dma-names = "tx", "rx";
+
+			reg-io-width = <4>;
+
+			status = "disabled";
+		};
+
+		spi2: spi@1f04f000 {
+			compatible = "baikal,bt1-ssi";
+			reg = <0x1f04f000 0x1000>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			interrupts = <GIC_SHARED 41 IRQ_TYPE_LEVEL_HIGH>;
+
+			clocks = <&ccu_sys CCU_SYS_APB_CLK>;
+			clock-names = "ssi_clk";
+
+			/*
+			 * Make sure Rx DMA channels have higher priority. Note
+			 * also that first two DW DMAC channels aren't suitable
+			 * for the well-balanced Tx and Rx SPI transfers.
+			 */
+			dmas = <&dma 10 0 1 0xe0>, <&dma 11 0 1 0x1c>;
+			dma-names = "tx", "rx";
+
+			reg-io-width = <4>;
+
+			status = "disabled";
+		};
+
+		pvt: temperature-sensor@1f200000 {
+			compatible = "baikal,bt1-pvt";
+			reg = <0x1f200000 0x1000>;
+			#thermal-sensor-cells = <0>;
+
+			interrupts = <GIC_SHARED 31 IRQ_TYPE_LEVEL_HIGH>;
+
+			clocks = <&ccu_sys CCU_SYS_PVT_CLK>,
+				 <&ccu_sys CCU_SYS_APB_CLK>;
+			clock-names = "ref", "pclk";
+
+			status = "disabled";
+		};
+
+		efuse: efuse@1f201000 {
+			compatible = "baikal,bt1-efuse";
+			reg = <0x1f201000 0x1000>;
+
+			clocks = <&ccu_sys CCU_SYS_APB_CLK>;
+			clock-names = "pclk";
+
+			status = "disabled";
+		};
+	};
+
+	axi: bus@1f05a000 {
+		compatible = "baikal,bt1-axi", "simple-bus";
+		reg = <0 0x1f05a000 0 0x1000>,
+		      <0 0x1f04d110 0 0x8>;
+		reg-names = "qos", "ehb";
+		#address-cells = <2>;
+		#size-cells = <2>;
+		#interconnect-cells = <1>;
+
+		/*
+		 * CPU can find the AXI-accessible devices over the next MMIO
+		 * ranges.
+		 */
+		ranges = <0 0x08000000 0 0x08000000 0 0x13dc0000>,
+			 <0 0x1bf80000 0 0x1bf80000 0 0x00040000>,
+			 <0 0x1bfc0000 0 0x1bfc0000 0 0x03c38000>;
+
+		/*
+		 * Not all AXI-bus DMA-capable devices can reach any address in
+		 * the physical memory space. SATA/USB/GMACx are limited to work
+		 * with the lowest 4GB of memory. Here we set the normal DMA
+		 * ranges mapping, while device-specific dma-ranges or device
+		 * driver software must make sure the devices have been
+		 * restricted on working with the permited memory range.
+		 */
+		dma-ranges = <0 0 0 0 0x100 0>;
+
+		interrupts = <GIC_SHARED 127 IRQ_TYPE_LEVEL_HIGH>;
+
+		clocks = <&ccu_axi CCU_AXI_MAIN_CLK>;
+		clock-names = "aclk";
+
+		resets = <&ccu_axi CCU_AXI_MAIN_RST>;
+		reset-names = "arst";
+
+		syscon = <&syscon>;
+
+		/*
+		 * Note the (dma-)ranges mapping must be 64K aligned due to
+		 * iATU constraints (lowest 16 bits aren't writable). Also
+		 * note that we have to split the MEM-range up into two so
+		 * one of them would be 256MB-aligned as some of the PCIe
+		 * peripherals require. It can be done since AXI-interconnect
+		 * doesn't permit the PCIe-master to access the MMIO-range
+		 * anyway, so we can freely use the memory range above
+		 * 0x1bfc0000 locally within the PCIe space.
+		 */
+		pcie: pcie@1f052000 {
+			compatible = "baikal,bt1-pcie";
+			device_type = "pci";
+			reg = <0 0x1f052000 0 0x1000>,
+			      <0 0x1f053000 0 0x1000>,
+			      <0 0x1bdb0000 0 0x10000>;
+			reg-names = "dbi", "dbi2", "config";
+			#address-cells = <3>;
+			#size-cells = <2>;
+			ranges = <0x82000000 0 0x08000000 0 0x08000000 0 0x03da0000>, /* mem */
+				 <0x82000000 0 0x10000000 0 0x0bda0000 0 0x10000000>, /* mem */
+				 <0x81000000 0 0x0bda0000 0 0x1bda0000 0 0x00010000>; /* io */
+			bus-range = <0x0 0xff>;
+
+			interrupts = <GIC_SHARED 80 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SHARED 81 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SHARED 82 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SHARED 83 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SHARED 84 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SHARED 85 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SHARED 86 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SHARED 87 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SHARED 88 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SHARED 89 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SHARED 90 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SHARED 91 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SHARED 92 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SHARED 93 IRQ_TYPE_LEVEL_HIGH>;
+			interrupt-names = "dma0", "dma1", "dma2", "dma3",
+					  "dma4", "dma5", "dma6", "dma7",
+					  "msi", "aer", "pme", "hp", "bw_mg",
+					  "l_eq";
+
+			/*
+			 * Note 1. External reference clock source is required
+			 * for the interface to work (name "ref").
+			 * Note 2. PCIe AXI M and S clocks and resets are
+			 * defined from the system interrconnected point of
+			 * view so the AXI master and slave interfaces are
+			 * actually connected to the DW PCIe RC AXI Slave and
+			 * Master ports respectively.
+			 */
+			clocks = <&ccu_sys CCU_SYS_APB_CLK>,
+				 <&ccu_axi CCU_AXI_PCIE_S_CLK>,
+				 <&ccu_axi CCU_AXI_PCIE_M_CLK>;
+			clock-names = "dbi", "mstr", "slv";
+
+			resets = <&ccu_axi CCU_AXI_PCIE_S_RST>,
+				 <&ccu_axi CCU_AXI_PCIE_M_RST>,
+				 <&ccu_sys CCU_SYS_PCIE_PWR_RST>,
+				 <&ccu_sys CCU_SYS_PCIE_HOT_RST>,
+				 <&ccu_sys CCU_SYS_PCIE_PCS_PHY_RST>,
+				 <&ccu_sys CCU_SYS_PCIE_CORE_RST>,
+				 <&ccu_sys CCU_SYS_PCIE_PIPE0_RST>,
+				 <&ccu_sys CCU_SYS_PCIE_STICKY_RST>,
+				 <&ccu_sys CCU_SYS_PCIE_NSTICKY_RST>;
+			reset-names = "mstr", "slv", "pwr", "hot", "phy",
+				      "core", "pipe", "sticky", "non-sticky";
+
+			baikal,bt1-syscon = <&syscon>;
+
+			num-lanes = <4>;
+			max-link-speed = <3>;
+
+			status = "disabled";
+		};
+
+		sram: sram-controller@1bf80000 {
+			compatible = "baikal,bt1-sram", "mmio-sram";
+			reg = <0 0x1bf80000 0 0x10000>;
+			#address-cells = <1>;
+			#size-cells = <1>;
+			ranges = <0 0 0x1bf80000 0x10000>;
+
+			clocks = <&ccu_axi CCU_AXI_SRAM_CLK>;
+			clock-names = "aclk";
+
+			resets = <&ccu_axi CCU_AXI_SRAM_RST>;
+			reset-names = "arst";
+
+			mux-controls = <&boot_mux 1>;
+
+			status = "disabled";
+
+			boot-sram@0 {
+				compatible = "baikal,bt1-boot-sram";
+				reg = <0 0x10000>;
+				label="Internal SRAM";
+				export;
+			};
+		};
+
+		dma: dma-controller@1f041000 {
+			compatible = "baikal,bt1-dmac", "snps,dma-spear1340";
+			reg = <0 0x1f041000 0 0x1000>;
+			#dma-cells = <4>;
+
+			interrupts = <GIC_SHARED 56 IRQ_TYPE_LEVEL_HIGH>;
+
+			/* Clock rate up to 200MHz */
+			clocks = <&ccu_sys CCU_SYS_APB_CLK>;
+			clock-names = "hclk";
+
+			dma-channels = <8>;
+			dma-requests = <12>;
+			dma-masters = <2>;
+
+			chan_allocation_order = <0>;
+			chan_priority = <0>;
+			block_size = <4095>;
+			data-width = <16 4>;
+			multi-block = <0 0 0 0 0 0 0 0>;
+			snps,max-burst-len = <16 16 4 4 4 4 4 4>;
+
+			status = "disabled";
+		};
+
+		mc: memory-controller@1f042000 {
+			compatible = "baikal,bt1-ddrc";
+			reg = <0 0x1f042000 0 0x1000>;
+
+			interrupts = <GIC_SHARED 96 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SHARED 97 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SHARED 98 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SHARED 99 IRQ_TYPE_LEVEL_HIGH>;
+			interrupt-names = "dfi_e", "ecc_ce", "ecc_ue", "ecc_sbr";
+
+			clocks = <&ccu_sys CCU_SYS_APB_CLK>,
+				 <&ccu_axi CCU_AXI_DDR_CLK>,
+				 <&ccu_pll CCU_DDR_PLL>;
+			clock-names = "pclk", "aclk", "core";
+
+			resets = <&ccu_axi CCU_AXI_DDR_RST>,
+                                 <&ccu_sys CCU_SYS_DDR_INIT_RST>;
+			reset-names = "arst", "core";
+
+			status = "disabled";
+		};
+
+		mc_phy: memory-controller-phy@1f043000 {
+			compatible = "baikal,bt1-ddrc-phy";
+			reg = <0 0x1f043000 0 0x1000>;
+
+			clocks = <&ccu_sys CCU_SYS_APB_CLK>,
+				 <&ccu_pll CCU_DDR_PLL>;
+			clock-names = "pclk", "ddr";
+
+			status = "disabled";
+		};
+
+		/*
+		 * DWC AHCI SATA controller has been configured with 32-bits
+		 * AMBA Master Address Bus width. Make sure any buffer
+		 * allocated above that limit is bounced down to the permitted
+		 * memory space before being passed to the device.
+		 */
+		sata: sata@1f050000 {
+			compatible = "baikal,bt1-ahci";
+			reg = <0 0x1f050000 0 0x2000>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			interrupts = <GIC_SHARED 64 IRQ_TYPE_LEVEL_HIGH>;
+
+			/* Using an external 100MHz clock source is preferable */
+			clocks = <&ccu_sys CCU_SYS_APB_CLK>,
+				 <&ccu_axi CCU_AXI_SATA_CLK>,
+				 <&ccu_sys CCU_SYS_SATA_REF_CLK>;
+			clock-names = "pclk", "aclk", "ref";
+
+			resets = <&ccu_axi CCU_AXI_SATA_RST>,
+				 <&ccu_sys CCU_SYS_SATA_REF_RST>;
+			reset-names = "arst", "ref";
+
+			ports-implemented = <0x3>;
+
+			status = "disabled";
+
+			sata0: sata-port@0 {
+				reg = <0>;
+
+				snps,tx-ts-max = <16>;
+				snps,rx-ts-max = <16>;
+
+				status = "disabled";
+			};
+
+			sata1: sata-port@1 {
+				reg = <1>;
+
+				snps,tx-ts-max = <16>;
+				snps,rx-ts-max = <16>;
+
+				status = "disabled";
+			};
+		};
+
+		/*
+		 * Replace compatible string with "baikal,bt1-xgmac", drop the
+		 * XPCS reg space and enable the xgmac_mi node shall you need
+		 * to have the XGMAC device handled by the STMMAC driver.
+		 */
+		xgmac: ethernet@1f054000 {
+			compatible = "amd,bt1-xgmac";
+			reg = <0 0x1f054000 0 0x4000>,
+			      <0 0x1f05d000 0 0x1000>;
+			reg-names = "stmmaceth", "xpcs";
+
+			interrupts = <GIC_SHARED 74 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SHARED 75 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SHARED 76 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SHARED 77 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SHARED 78 IRQ_TYPE_LEVEL_HIGH>;
+			interrupt-names = "macirq", "dma_tx0", "dma_tx1",
+					  "dma_rx0", "dma_rx1";
+
+			clocks = <&ccu_sys CCU_SYS_APB_CLK>,
+				 <&ccu_axi CCU_AXI_XGMAC_CLK>,
+				 <&ccu_sys CCU_SYS_XGMAC_REF_CLK>,
+				 <&ccu_sys CCU_SYS_XGMAC_PTP_CLK>;
+			clock-names = "pclk", "stmmaceth", "tx", "ptp_ref";
+
+			resets = <&ccu_axi CCU_AXI_XGMAC_RST>;
+			reset-names = "stmmaceth";
+
+			pcs-handle = <&xgmac_pcs>;
+
+			/*
+			 * xgmii - auto-negotiate 10GBASE-KX4/KR protocols
+			 *         (set the managed property to "in-band-status")
+			 * 10gbase-r - select 10GBASE-R protocol
+			 * 10gbase-x/xaui - select 10GBASE-X protocol
+			 *         (set the managed property to "auto")
+			 */
+			phy-mode = "xgmii";
+
+			managed = "in-band-status";
+
+			rx-fifo-depth = <32768>;
+			tx-fifo-depth = <32768>;
+
+			/*
+			 * Actual burst length will be (32 * 8 * 16) bytes due
+			 * to the snps,no-pbl-x8 property absence and having
+			 * the AXI bus data width of 128 bits.
+			 */
+			snps,pbl = <32>;
+			snps,data-width = <16>;
+
+			/* Enable TSO for all DMA channels */
+			snps,tso;
+
+			snps,perfect-filter-entries = <8>;
+			snps,multicast-filter-bins = <64>;
+			local-mac-address = [ 00 20 13 ba 1c a1 ];
+
+			status = "disabled";
+
+			axi-bus-config {
+				snps,wr_osr_lmt = <0x7>;
+				snps,rd_osr_lmt = <0x7>;
+				/* It's AXI3 bus so up to 16 xfers */
+				snps,blen = <0 0 0 0 16 8 4>;
+			};
+		};
+
+		hwa: hwa@1f05b000 {
+			compatible = "baikal,bt1-hwa";
+			reg = <0 0x1f05b000 0 0x1000>,
+			      <0 0x1f05c000 0 0x1000>;
+			reg-names = "core", "dma";
+
+			interrupts = <GIC_SHARED 104 IRQ_TYPE_LEVEL_HIGH>;
+
+			clocks = <&ccu_sys CCU_SYS_APB_CLK>,
+				 <&ccu_axi CCU_AXI_HWA_CLK>,
+				 <&ccu_sys CCU_SYS_HWA_CLK>;
+			clock-names = "pclk", "aclk", "ref";
+
+			resets = <&ccu_axi CCU_AXI_HWA_RST>;
+			reset-names = "arst";
+
+			status = "disabled";
+		};
+
+		xgmac_mi: mdio@1f05d000 {
+			compatible = "snps,dw-xpcs-mi";
+			reg = <0 0x1f05d000 0 0x1000>;
+			reg-names = "indirect";
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			reg-io-width = <4>;
+
+			status = "disabled";
+
+			xgmac_pcs: ethernet-pcs@0 {
+				compatible = "baikal,bt1-xpcs";
+				reg = <0>;
+
+				interrupts = <GIC_SHARED 79 IRQ_TYPE_LEVEL_HIGH>;
+
+				clocks = <&ccu_sys CCU_SYS_XGMAC_REF_CLK>;
+				clock-names = "core";
+			};
+		};
+
+		gmac0: ethernet@1f05e000 {
+			compatible = "baikal,bt1-gmac";
+			reg = <0 0x1f05e000 0 0x2000>;
+			#address-cells = <1>;
+			#size-cells = <2>;
+			dma-ranges = <0 0 0 0x1 0>;
+
+			interrupts = <GIC_SHARED 72 IRQ_TYPE_LEVEL_HIGH>;
+			interrupt-names = "macirq";
+
+			clocks = <&ccu_sys CCU_SYS_APB_CLK>,
+				 <&ccu_axi CCU_AXI_GMAC0_CLK>,
+				 <&ccu_sys CCU_SYS_GMAC0_TX_CLK>,
+				 <&ccu_sys CCU_SYS_GMAC0_PTP_CLK>;
+			clock-names = "pclk", "stmmaceth", "tx", "ptp_ref";
+
+			resets = <&ccu_axi CCU_AXI_GMAC0_RST>;
+			reset-names = "stmmaceth";
+
+			/* DW GMAC is configured to export 1xGPI and 1xGPO */
+			ngpios = <2>;
+
+			interrupt-controller;
+			#interrupt-cells = <2>;
+
+			gpio-controller;
+			#gpio-cells = <2>;
+
+			/*
+			 * MAC always adds 2ns delay of TXC with respect to TXD
+			 * so let the PHY to add some RXC delay if it's
+			 * applicable.
+			 */
+			phy-mode = "rgmii-rxid";
+			tx-internal-delay-ps = <2000>;
+
+			rx-fifo-depth = <16384>;
+			tx-fifo-depth = <16384>;
+
+			/*
+			 * Actual burst length will be (32 * 8 * 16) bytes due
+			 * to the snps,no-pbl-x8 property absence and having
+			 * the AXI bus data width of 128 bits.
+			 */
+			snps,pbl = <32>;
+			snps,data-width = <16>;
+
+			snps,perfect-filter-entries = <8>;
+			snps,multicast-filter-bins = <0>;
+			loacl-mac-address = [ 7a 72 6c 4a 7a 07 ];
+
+			status = "disabled";
+
+			axi-bus-config {
+				snps,wr_osr_lmt = <0x3>;
+				snps,rd_osr_lmt = <0x3>;
+				snps,blen = <0 0 0 0 16 8 4>;
+			};
+
+			gmac0_mdio: mdio {
+				compatible = "snps,dwmac-mdio";
+				#address-cells = <1>;
+				#size-cells = <0>;
+			};
+		};
+
+		gmac1: ethernet@1f060000 {
+			compatible = "baikal,bt1-gmac";
+			reg = <0 0x1f060000 0 0x2000>;
+			#address-cells = <1>;
+			#size-cells = <2>;
+			dma-ranges = <0 0 0 0x1 0>;
+
+			interrupts = <GIC_SHARED 73 IRQ_TYPE_LEVEL_HIGH>;
+			interrupt-names = "macirq";
+
+			clocks = <&ccu_sys CCU_SYS_APB_CLK>,
+				 <&ccu_axi CCU_AXI_GMAC1_CLK>,
+				 <&ccu_sys CCU_SYS_GMAC1_TX_CLK>,
+				 <&ccu_sys CCU_SYS_GMAC1_PTP_CLK>;
+			clock-names = "pclk", "stmmaceth", "tx", "ptp_ref";
+
+			resets = <&ccu_axi CCU_AXI_GMAC1_RST>;
+			reset-names = "stmmaceth";
+
+			/* DW GMAC is configured to export 1xGPI and 1xGPO */
+			ngpios = <2>;
+
+			interrupt-controller;
+			#interrupt-cells = <2>;
+
+			gpio-controller;
+			#gpio-cells = <2>;
+
+			/*
+			 * MAC always adds 2ns delay of TXC with respect to TXD
+			 * so let the PHY to add some RXC delay if it's
+			 * applicable.
+			 */
+			phy-mode = "rgmii-rxid";
+			tx-internal-delay-ps = <2000>;
+
+			rx-fifo-depth = <16384>;
+			tx-fifo-depth = <16384>;
+
+			/*
+			 * Actual burst length will be (32 * 8 * 16) bytes due
+			 * to the snps,no-pbl-x8 property absence and having
+			 * the AXI bus data width of 128 bits.
+			 */
+			snps,pbl = <32>;
+			snps,data-width = <16>;
+
+			snps,perfect-filter-entries = <8>;
+			snps,multicast-filter-bins = <0>;
+			loacl-mac-address = [ 7a 72 6c 4a 7b 07 ];
+
+			status = "disabled";
+
+			axi-bus-config {
+				snps,wr_osr_lmt = <0x3>;
+				snps,rd_osr_lmt = <0x3>;
+				snps,blen = <0 0 0 0 16 8 4>;
+			};
+
+			gmac1_mdio: mdio {
+				compatible = "snps,dwmac-mdio";
+				#address-cells = <1>;
+				#size-cells = <0>;
+			};
+		};
+
+		usb: usb@1f100000 {
+			compatible = "baikal,bt1-usb3", "snps,dwc3";
+			reg = <0 0x1f100000 0 0x100000>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			interrupts = <GIC_SHARED 68 IRQ_TYPE_LEVEL_HIGH>;
+			interrupt-names = "host";
+
+			clocks = <&ccu_sys CCU_SYS_APB_CLK>,
+				 <&ccu_axi CCU_AXI_USB_CLK>,
+				 <&ccu_sys CCU_SYS_USB_CLK>;
+			clock-names = "pclk", "bus_early", "ref";
+
+			resets = <&ccu_axi CCU_AXI_USB_RST>;
+			reset-names = "arst";
+
+			dr_mode = "host";
+			phy_type = "ulpi";
+			maximum-speed = "high-speed";
+
+			snps,incr-burst-type-adjustment = <1 4 8 16>;
+
+			status = "disabled";
+		};
+	};
+};

@@ -1,0 +1,45 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * Copyright (C) 2022 BAIKAL ELECTRONICS, JSC
+ *
+ * Baikal Electronics KR SFP+ Mezzanine Card device tree
+ */
+
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/interrupt-controller/irq.h>
+
+/*
+ * TODO Convert this file to be a subordinate of a nexus node/connector when the
+ * kernel gets ready for it:
+ * 3:  I2C SCL
+ * 5:  I2C SDA
+ * 7:  SFP Mod ABS
+ * 9:  SFP Tx Disable
+ * 11: SFP Tx Fault
+ * 12: SFP Rx Los
+ * 17,18,19,20: TxN3,RxN3,TxP3,RxP3 - Lane 3 10GBASE-X
+ * 23,24,25,26: TxN2,RxN2,TxP2,RxP2 - Lane 2 10GBASE-X
+ * 29,30,31,32: TxN1,RxN1,TxP1,RxP1 - Lane 1 10GBASE-X
+ * 35,36,37,38: TxN0,RxN0,TxP0,RxP0 - Lane 0 10GBASE-X/10GBASE-R
+ */
+
+/ {
+	xgmac_sfp: sfp {
+		compatible = "sff,sfp";
+
+		i2c-bus = <&i2c1>;
+
+		los-gpios = <&port0 27 GPIO_ACTIVE_HIGH>;
+		mod-def0-gpios = <&port0 11 GPIO_ACTIVE_LOW>;
+		tx-disable-gpios = <&port0 10 GPIO_ACTIVE_HIGH>;
+		tx-fault-gpios = <&port0 11 GPIO_ACTIVE_HIGH>;
+	};
+};
+
+&xgmac_pcs {
+	sfp = <&xgmac_sfp>;
+};
+
+&xgmac {
+	phy-mode = "10gbase-r";
+};

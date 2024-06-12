@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: GPL-2.0-only
+#
+# Copyright (C) 2020 BAIKAL ELECTRONICS, JSC
+#
+# Baikal-T1 platform makefile
+#
+platform-$(CONFIG_MIPS_BAIKAL_T1)	+= baikal-t1/
+cflags-$(CONFIG_MIPS_BAIKAL_T1)		+= -I$(srctree)/arch/mips/include/asm/mach-baikal-t1
+ifdef CONFIG_KVM_GUEST
+    load-$(CONFIG_MIPS_BAIKAL_T1)	+= 0x0000000040100000
+    zload-$(CONFIG_MIPS_BAIKAL_T1)	+= 0xffffffff45100000
+else
+    load-$(CONFIG_MIPS_BAIKAL_T1)	+= 0xffffffff80100000
+    zload-$(CONFIG_MIPS_BAIKAL_T1)	+= 0xffffffff85100000
+endif
+all-$(CONFIG_MIPS_BAIKAL_T1)		:= $(COMPRESSION_FNAME).bin

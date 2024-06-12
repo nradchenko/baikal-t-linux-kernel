@@ -1,0 +1,133 @@
+# SPDX-License-Identifier: (GPL-2.0 OR BSD-2-Clause)
+# Copyright (C) 2022 BAIKAL ELECTRONICS, JSC
+%YAML 1.2
+---
+$id: "http://devicetree.org/schemas/mfd/baikal,bt1-sys-con.yaml#"
+$schema: "http://devicetree.org/meta-schemas/core.yaml#"
+
+title: Baikal-T1 SoC System Controller
+
+maintainers:
+  - Serge Semin <fancer.lancer@gmail.com>
+
+description:
+  Baikal-T1 SoC is equipped with a System Controller which is responsible for
+  the SoC components setting up and consists of the next sub-blocks':'
+  PLL/AXI-bus/System devices Clocks Control Units, P5600 CM2 L2-RAM controller,
+  CPU cores reboot flag, persistent across reboots register, indirectly
+  accessible DW APB I2C controller, Boot Controller with a pre-installed memory
+  mapped firmware and a resource limited DW APB SSI, which is also can be used
+  to transparently access an external SPI flash by means of a dedicated IO
+  memory region.
+
+allOf:
+  - $ref: /schemas/mfd/syscon.yaml#
+
+properties:
+  compatible:
+    items:
+      - const: baikal,bt1-sys-con
+      - const: syscon
+      - const: simple-mfd
+
+  reg:
+    description:
+      Baikal-T1 System Controller CSR space. It includes CCU (Clock Control
+      Unit), L2 settings, Reboot flag and Reboot tolerant register, System I2C
+      controller CSRs.
+    maxItems: 1
+
+  reg-names:
+    const: sys
+
+  "#address-cells":
+    const: 1
+
+  "#size-cells":
+    const: 1
+
+  ranges: true
+
+  little-endian: true
+
+  clock-controller@1f04d000:
+    $ref: /schemas/clock/baikal,bt1-ccu-pll.yaml#
+
+  clock-controller@1f04d030:
+    $ref: /schemas/clock/baikal,bt1-ccu-div.yaml#
+
+  clock-controller@1f04d060:
+    $ref: /schemas/clock/baikal,bt1-ccu-div.yaml#
+
+  l2@1f04d028:
+    $ref: /schemas/cache/baikal,bt1-l2-ctl.yaml#
+
+  reboot:
+    $ref: /schemas/power/reset/syscon-reboot.yaml#
+
+  reboot-mode:
+    $ref: /schemas/power/reset/syscon-reboot-mode.yaml#
+
+  i2c@1f04d100:
+    $ref: /schemas/i2c/snps,designware-i2c.yaml#
+
+required:
+  - compatible
+  - reg
+
+unevaluatedProperties: false
+
+examples:
+  - |
+    syscon@1f04d000 {
+      compatible = "baikal,bt1-sys-con", "syscon", "simple-mfd";
+      reg = <0x1f04d000 0x1000>;
+      #address-cells = <1>;
+      #size-cells = <1>;
+      ranges;
+
+      little-endian;
+      reg-io-width = <4>;
+
+      clock-controller@1f04d000 {
+        compatible = "baikal,bt1-ccu-pll";
+        reg = <0x1f04d000 0x028>;
+        #clock-cells = <1>;
+
+        clocks = <&clk25m>;
+        clock-names = "ref_clk";
+      };
+
+      clock-controller@1f04d030 {
+        compatible = "baikal,bt1-ccu-axi";
+        reg = <0x1f04d030 0x030>;
+        #clock-cells = <1>;
+        #reset-cells = <1>;
+
+        clocks = <&ccu_pll 1>,
+                 <&ccu_pll 2>,
+                 <&ccu_pll 3>;
+        clock-names = "sata_clk", "pcie_clk", "eth_clk";
+      };
+
+      l2@1f04d028 {
+        compatible = "baikal,bt1-l2-ctl";
+        reg = <0x1f04d028 0x004>;
+
+        baikal,l2-ws-latency = <0>;
+        baikal,l2-tag-latency = <0>;
+        baikal,l2-data-latency = <1>;
+      };
+
+      i2c@1f04d100 {
+        compatible = "baikal,bt1-sys-i2c";
+        reg = <0x1f04d100 0x010>;
+        #address-cells = <1>;
+        #size-cells = <0>;
+
+        interrupts = <0 32 4>;
+
+        clocks = <&ccu_sys 1>;
+      };
+    };
+...

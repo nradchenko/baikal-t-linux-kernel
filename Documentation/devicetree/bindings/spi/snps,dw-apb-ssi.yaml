@@ -32,8 +32,13 @@ allOf:
       properties:
         mux-controls:
           maxItems: 1
+        reg-names:
+          items:
+            - const: config
+            - const: map
       required:
         - mux-controls
+        - reg-names
     else:
       required:
         - interrupts
@@ -177,6 +182,7 @@ examples:
       compatible = "baikal,bt1-sys-ssi";
       reg = <0x1f040100 0x900>,
             <0x1c000000 0x1000000>;
+      reg-names = "config", "map";
       #address-cells = <1>;
       #size-cells = <0>;
       mux-controls = <&boot_mux>;

@@ -356,6 +356,7 @@ static struct work_registers build_get_work_registers(u32 **p)
 	if (scratch_reg >= 0) {
 		/* Save in CPU local C0_KScratch? */
 		UASM_i_MTC0(p, 1, c0_kscratch(), scratch_reg);
+		uasm_i_ehb(p);
 		r.r1 = K0;
 		r.r2 = K1;
 		r.r3 = 1;

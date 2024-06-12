@@ -12,7 +12,7 @@ config DW_EDMA
 config DW_EDMA_PCIE
 	tristate "Synopsys DesignWare eDMA PCIe driver"
 	depends on PCI && PCI_MSI
-	select DW_EDMA
+	depends on DW_EDMA
 	help
 	  Provides a glue-logic between the Synopsys DesignWare
 	  eDMA controller and an endpoint PCIe device. This also serves

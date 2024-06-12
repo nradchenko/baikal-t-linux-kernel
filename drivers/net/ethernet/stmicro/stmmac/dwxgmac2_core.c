@@ -444,7 +444,6 @@ static void dwxgmac2_set_filter(struct mac_device_info *hw,
 	u32 value = readl(ioaddr + XGMAC_PACKET_FILTER);
 	int mcbitslog2 = hw->mcast_bits_log2;
 	u32 mc_filter[8];
-	int i;
 
 	value &= ~(XGMAC_FILTER_PR | XGMAC_FILTER_HMC | XGMAC_FILTER_PM);
 	value |= XGMAC_FILTER_HPF;
@@ -457,9 +456,7 @@ static void dwxgmac2_set_filter(struct mac_device_info *hw,
 	} else if ((dev->flags & IFF_ALLMULTI) ||
 		   (netdev_mc_count(dev) > hw->multicast_filter_bins)) {
 		value |= XGMAC_FILTER_PM;
-
-		for (i = 0; i < XGMAC_MAX_HASH_TABLE; i++)
-			writel(~0x0, ioaddr + XGMAC_HASH_TABLE(i));
+		memset(mc_filter, 0xff, sizeof(mc_filter));
 	} else if (!netdev_mc_empty(dev) && (dev->flags & IFF_MULTICAST)) {
 		struct netdev_hw_addr *ha;
 
@@ -475,7 +472,7 @@ static void dwxgmac2_set_filter(struct mac_device_info *hw,
 	dwxgmac2_set_mchash(ioaddr, mc_filter, mcbitslog2);
 
 	/* Handle multiple unicast addresses */
-	if (netdev_uc_count(dev) > hw->unicast_filter_entries) {
+	if (netdev_uc_count(dev) > hw->unicast_filter_entries - 1) {
 		value |= XGMAC_FILTER_PR;
 	} else {
 		struct netdev_hw_addr *ha;

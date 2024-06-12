@@ -295,6 +295,16 @@ int xgbe_config_netdev(struct xgbe_prv_data *pdata)
 		return ret;
 	}
 
+	/* Set platform-specific DMA bus settings */
+	if (pdata->vdata->blen)
+		pdata->blen = pdata->vdata->blen;
+	if (pdata->vdata->pbl)
+		pdata->pbl = pdata->vdata->pbl;
+	if (pdata->vdata->rd_osr_limit)
+		pdata->rd_osr_limit = pdata->vdata->rd_osr_limit;
+	if (pdata->vdata->wr_osr_limit)
+		pdata->wr_osr_limit = pdata->vdata->wr_osr_limit;
+
 	/* Set default max values if not provided */
 	if (!pdata->tx_max_fifo_size)
 		pdata->tx_max_fifo_size = pdata->hw_feat.tx_fifo_size;

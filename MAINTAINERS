@@ -3121,6 +3121,7 @@ F:	arch/arm/mach-zynq/
 F:	drivers/clocksource/timer-cadence-ttc.c
 F:	drivers/cpuidle/cpuidle-zynq.c
 F:	drivers/edac/synopsys_edac.c
+F:	drivers/edac/zynq_edac.c
 F:	drivers/i2c/busses/i2c-cadence.c
 F:	drivers/i2c/busses/i2c-xiic.c
 F:	drivers/mmc/host/sdhci-of-arasan.c
@@ -3553,6 +3554,13 @@ F:	Documentation/devicetree/bindings/leds/backlight
 F:	drivers/video/backlight/
 F:	include/linux/backlight.h
 F:	include/linux/pwm_backlight.h
+
+BAIKAL-T1 PVT HARDWARE MONITOR DRIVER
+M:	Serge Semin <fancer.lancer@gmail.com>
+L:	linux-hwmon@vger.kernel.org
+S:	Supported
+F:	Documentation/devicetree/bindings/hwmon/baikal,bt1-pvt.yaml
+F:	drivers/hwmon/bt1-pvt.*
 
 BARCO P50 GPIO DRIVER
 M:	Santosh Kumar Yadav <santoshkumar.yadav@barco.com>
@@ -13801,6 +13809,21 @@ F:	arch/mips/
 F:	drivers/platform/mips/
 F:	include/dt-bindings/mips/
 
+MIPS/BAIKAL-T1 PLATFORM
+M:	Serge Semin <fancer.lancer@gmail.com>
+L:	linux-mips@vger.kernel.org
+S:	Supported
+F:	Documentation/devicetree/bindings/bus/baikal,bt1-*
+F:	Documentation/devicetree/bindings/clock/baikal,bt1-*
+F:	Documentation/devicetree/bindings/mfd/baikal,bt1-*
+F:	Documentation/devicetree/bindings/memory-controllers/baikal,bt1-*
+F:	arch/mips/baikal-t1/
+F:	arch/mips/boot/dts/baikal-t1/
+F:	arch/mips/include/asm/mach-baikal-t1/
+F:	drivers/clk/baikal-t1/
+F:	drivers/bus/bt1-*
+F:	drivers/memory/bt1-l2-ctl.c
+
 MIPS BOSTON DEVELOPMENT BOARD
 M:	Paul Burton <paulburton@kernel.org>
 L:	linux-mips@vger.kernel.org
@@ -14647,8 +14670,9 @@ F:	tools/testing/selftests/ntb/
 NTB IDT DRIVER
 M:	Serge Semin <fancer.lancer@gmail.com>
 L:	ntb@lists.linux.dev
-S:	Supported
+S:	Maintained
 F:	drivers/ntb/hw/idt/
+F:	drivers/misc/eeprom/idt_89hpesx.c
 
 NTB INTEL DRIVER
 M:	Dave Jiang <dave.jiang@intel.com>
@@ -15851,11 +15875,12 @@ F:	drivers/pci/controller/dwc/pci-exynos.c
 
 PCI DRIVER FOR SYNOPSYS DESIGNWARE
 M:	Jingoo Han <jingoohan1@gmail.com>
-M:	Gustavo Pimentel <gustavo.pimentel@synopsys.com>
+M:	Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+R:	Gustavo Pimentel <gustavo.pimentel@synopsys.com>
+R:	Serge Semin <fancer.lancer@gmail.com>
 L:	linux-pci@vger.kernel.org
 S:	Maintained
-F:	Documentation/devicetree/bindings/pci/snps,dw-pcie.yaml
-F:	Documentation/devicetree/bindings/pci/snps,dw-pcie-ep.yaml
+F:	Documentation/devicetree/bindings/pci/snps,dw-pcie*.yaml
 F:	drivers/pci/controller/dwc/*designware*
 
 PCI DRIVER FOR TI DRA7XX/J721E
@@ -15997,6 +16022,13 @@ L:	linux-pci@vger.kernel.org
 S:	Maintained
 F:	Documentation/devicetree/bindings/pci/axis,artpec*
 F:	drivers/pci/controller/dwc/*artpec*
+
+PCIE DRIVER FOR BAIKAL-T1
+M:	Serge Semin <fancer.lancer@gmail.com>
+L:	linux-pci@vger.kernel.org
+S:	Maintained
+F:	Documentation/devicetree/bindings/pci/baikal,bt1-pcie.yaml
+F:	drivers/pci/controller/dwc/pcie-bt1.c
 
 PCIE DRIVER FOR CAVIUM THUNDERX
 M:	Robert Richter <rric@kernel.org>
