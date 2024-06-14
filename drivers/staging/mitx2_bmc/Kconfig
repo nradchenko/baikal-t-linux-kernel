@@ -1,0 +1,11 @@
+config MITX2_BMC
+	tristate "mITX2 BMC driver"
+	depends on MIPS_BAIKAL_T1 || COMPILE_TEST
+	depends on I2C
+	help
+	  This option adds T-Platforms mITX BMC support
+	  which is present in mini-ITX boards.
+
+	  This driver can also be built as a module.  If so, the module
+	  will be called mitx2-bmc.
+
