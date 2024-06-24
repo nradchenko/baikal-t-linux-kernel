@@ -103,7 +103,7 @@ void __init *plat_get_fdt(void)
 	if (!fdt || fdt_check_header(fdt))
 		panic("No valid dtb found. Can't continue.");
 
-	pr_info("%s DTB found at %p\n", str, fdt);
+	pr_info("%s DTB found at %px\n", str, fdt);
 
 	return (void *)fdt;
 }
