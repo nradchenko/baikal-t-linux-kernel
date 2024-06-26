@@ -90,6 +90,11 @@ choice
 	  It's a Baikal-T1 SoC evaluation board specifically designed for
 	  the SoC-based software prototyping.
 
+	config BT1_DTB_MITX
+	bool "T-Platforms mITX Board"
+	help
+	  This option provides a dtb for T-Platforms mITX boards
+
 endchoice
 
 menu "Baikal-T1 Errata"

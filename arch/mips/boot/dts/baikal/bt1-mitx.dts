@@ -1,0 +1,264 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * Copyright (C) 2017-2018 T-platforms, JSC
+ * Copyright (C) 2022 BAIKAL ELECTRONICS, JSC
+ * Copyright (C) 2024 Nikita Radchenko <nradchenko@protonmail.com>
+ *
+ * Baikal-T1 mITX board device tree
+ */
+
+/dts-v1/;
+
+#include <dt-bindings/interrupt-controller/irq.h>
+#include <dt-bindings/leds/common.h>
+
+#include "bt1.dtsi"
+
+/ {
+	model = "Baikal-T1 mITX board";
+	compatible = "baikal,bt1", "tp,baikal-mitx-board";
+
+	chosen {
+		/*
+		 * Note of having both EARLY_PRINTK and SERIAL_EARLYCON
+		 * activated at the same time. If they both refer to the same
+		 * device, you'll end up with duplicated log messages.
+		 * Here by passing 'earlycon' to the kernel we'll activate it
+		 * to parse the stdout-path property to find the early console
+		 * device. System console will be then activated in accordance
+		 * with it if 'console=' parameter isn't passed. Any of the
+		 * following consoles are valid: ttyS{0,1}/uart{0,1} (which
+		 * alias is serial{0,1}), early_fdc (CDMM-JTAG serial iface).
+		 */
+		bootargs = "console=ttyS0,115200n8 earlycon maxcpus=2";
+		stdout-path = "serial0:115200n8";
+
+		/* It's implied that the bootloader updates the initrd address */
+		linux,initrd-start = <0 0>;
+		linux,initrd-end   = <0 0>;
+	};
+
+	memory {
+		/*
+		 * Declare required low-memory and additional 256MB of high-
+		 * memory, which due to the DW uMCTL2 controller specific setup
+		 * nearly always exists as being remapped upper part of the
+		 * first memory chip. Without low-level remapping that segment
+		 * is hidden behind the MMIO region and isn't reachable.
+		 * NOTE. For the reason of having MMIO above the very first
+		 * 128MB of the low memory, the second 128MB of the physical
+		 * memory is always unavailable as being hidden behind MMIO
+		 * and non-remappable by DW uMCTL2.
+		 */
+		device_type = "memory";
+		reg = <0 0x00000000 0 0x08000000>,
+		      <0 0x20000000 0 0x10000000>;
+	};
+
+	/* Standard xGMAC/PCIe/SATA reference clocks setup */
+	clocks {
+		xgmac_ref_clk: clock-oscillator-xgmac {
+			compatible = "fixed-clock";
+			#clock-cells = <0>;
+			clock-frequency = <156250000>;
+			clock-output-names = "xgmac156m";
+		};
+
+		pcie_ref_clk: clock-oscillator-pcie {
+			compatible = "fixed-clock";
+			#clock-cells = <0>;
+			clock-frequency = <100000000>;
+			clock-output-names = "pcie100m";
+		};
+
+		sata_ref_clk: clock-oscillator-sata {
+			compatible = "fixed-clock";
+			#clock-cells = <0>;
+			clock-frequency = <100000000>;
+			clock-output-names = "sata100m";
+		};
+	};
+
+	leds {
+		compatible = "gpio-leds";
+
+		led@hdd {
+			function = LED_FUNCTION_DISK_ACTIVITY;
+			gpios = <&port0 18 GPIO_ACTIVE_HIGH>;
+			linux,default-trigger = "disk-activity";
+		};
+	};
+};
+
+&l2 {
+	status = "okay";
+};
+
+&int_rom {
+	status = "okay";
+};
+
+&gpio0 {
+	status = "okay";
+};
+
+&gpio1 {
+	status = "okay";
+};
+
+&i2c2 {
+	status = "okay";
+	clock-frequency = <100000>;
+
+	bmc: bmc@8 {
+		compatible = "tp,mitx2-bmc";
+		reg = <0x08>;
+	};
+
+	shred: gpio@21 {
+		compatible = "nxp,pcf8574";
+		reg = <0x21>;
+		gpio-controller;
+		#gpio-cells = <2>;
+		interrupt-parent = <&port0>;
+		interrupts = <25 IRQ_TYPE_LEVEL_LOW>;
+		interrupt-controller;
+		#interrupt-cells = <2>;
+		ngpios = <8>; /* Informative */
+	};
+
+	rtc: rtc@51 {
+		compatible = "nxp,pcf2129", "nxp,pcf2127";
+		reg = <0x51>;
+	};
+
+	clkgen0: clkgen@68 {
+		compatible = "idt,5p49v59";
+		reg = <0x68>;
+	};
+
+	clkgen1: clkgen@6a {
+		compatible = "idt,5p49v59";
+		reg = <0x6A>;
+	};
+};
+
+&timer_dw0 {
+	status = "okay";
+};
+
+&timer_dw1 {
+	status = "okay";
+};
+
+&timer_dw2 {
+	status = "okay";
+};
+
+&uart0 {
+	status = "okay";
+};
+
+&uart1 {
+	status = "okay";
+};
+
+&wdt {
+	status = "okay";
+};
+
+&pvt {
+	status = "okay";
+};
+
+&efuse {
+	status = "okay";
+};
+
+&pcie {
+	clocks = <&ccu_sys CCU_SYS_APB_CLK>,
+		 <&ccu_axi CCU_AXI_PCIE_M_CLK>,
+		 <&ccu_axi CCU_AXI_PCIE_S_CLK>,
+		 <&pcie_ref_clk>;
+	clock-names = "dbi", "mstr", "slv", "ref";
+
+	status = "okay";
+};
+
+&sram {
+	status = "okay";
+};
+
+&dma {
+	status = "okay";
+};
+
+&mc {
+	status = "okay";
+};
+
+&mc_phy {
+	status = "okay";
+};
+
+&sata {
+	clocks = <&ccu_sys CCU_SYS_APB_CLK>,
+		 <&ccu_axi CCU_AXI_SATA_CLK>,
+		 <&sata_ref_clk>;
+	clock-names = "pclk", "aclk", "ref";
+
+	status = "okay";
+};
+
+&sata0 {
+	hba-port-cap = <HBA_PORT_FBSCP>;
+
+	status = "okay";
+};
+
+&sata1 {
+	hba-port-cap = <HBA_PORT_FBSCP>;
+
+	status = "okay";
+};
+
+&hwa {
+	status = "okay";
+};
+
+&gmac0_mdio {
+	reset-delay-us = <10000>;
+	reset-post-delay-us = <30000>;
+
+	gmac0_phy: ethernet-phy {
+		compatible = "ethernet-phy-ieee802.3-c22";
+	};
+};
+
+&gmac0 {
+	mac-address = [ 7a 72 6c 4a 7a 07 ];
+
+	phy-handle = <&gmac0_phy>;
+
+	status = "okay";
+};
+
+&xgmac_mi {
+	status = "okay";
+};
+
+&xgmac_pcs {
+	clocks = <&ccu_sys CCU_SYS_XGMAC_REF_CLK>,
+			 <&xgmac_ref_clk>;
+	clock-names = "core", "pad";
+};
+
+&xgmac {
+	mac-address = [ 00 20 13 ba 1c a1 ];
+
+	status = "okay";
+};
+
+&usb {
+	status = "okay";
+};
